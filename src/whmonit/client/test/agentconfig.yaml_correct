@@ -1,0 +1,16 @@
+sensors:
+- config: {frequency: 60}
+  config_id: a9299
+  sensor: uptime
+  target: aginozanthus
+  target_id: aginozanthusid
+- config: {frequency: 10}
+  config_id: a9299
+  sensor: processes
+  target: aginozanthus
+  target_id: aginozanthusid
+- config: {frequency: 30}
+  config_id: a9299
+  sensor: sysstat
+  target: aginozanthus
+  target_id: aginozanthusid

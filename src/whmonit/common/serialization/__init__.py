@@ -1,0 +1,3 @@
+'''
+:class:`.TypeRegistry` serialization mechanism.
+'''
