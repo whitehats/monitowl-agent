@@ -8,7 +8,7 @@ from datetime import datetime
 from multiprocessing.queues import Empty
 
 import requests
-from mock import MagicMock
+from mock import MagicMock, patch
 from interruptingcow import timeout
 
 from whmonit.common.types import SensorConfig
@@ -31,6 +31,8 @@ class TestAgent(object):
         '''
         Setup test.
         '''
+        self.storage_manager = patch('whmonit.client.agent.StorageManager')
+        self.storage_manager.start()
         self.agentconfig = UnbufferedNamedTemporaryFile('sensors: []', False)
         self.agent = Agent(
             self.agentconfig.name,
@@ -59,6 +61,7 @@ class TestAgent(object):
         '''
         Teardown test.
         '''
+        self.storage_manager.stop()
         self.agentconfig.close()
         self.csr_file.close()
         self.crt_file.close()
@@ -137,11 +140,10 @@ class TestShipper(object):
         Setup test.
         '''
         self.send_results = MagicMock()
-        AgentInternal._prepare_sqlite = MagicMock()
+        self.sqliteconn = MagicMock()
         AgentInternal.assert_parent_exists = MagicMock()
         AgentInternal.run = MagicMock()
-        self.shipper = Shipper(':memory:', self.send_results)
-        self.shipper.sqliteconn = MagicMock()
+        self.shipper = Shipper(self.sqliteconn, self.send_results)
 
     def test_run_no_data(self):
         '''
@@ -153,8 +155,7 @@ class TestShipper(object):
         except RuntimeError:
             pass
 
-        assert self.shipper._prepare_sqlite.called
-        assert self.shipper.sqliteconn.cursor.called
+        assert self.sqliteconn.cursor.called
         assert self.shipper.assert_parent_exists.called
 
 
@@ -168,10 +169,10 @@ class TestReceiver(object):
         Setup test.
         '''
         self.send_results = MagicMock()
-        AgentInternal._prepare_sqlite = MagicMock()
+        self.sqliteconn = MagicMock()
         AgentInternal.assert_parent_exists = MagicMock()
         AgentInternal.run = MagicMock()
-        self.receiver = Receiver(':memory:', self.send_results)
+        self.receiver = Receiver(self.sqliteconn, self.send_results)
         self.receiver.queue = MagicMock()
         self.receiver.queue.get_nowait.side_effect = Empty
         self.receiver.serializer = MagicMock()
@@ -186,8 +187,7 @@ class TestReceiver(object):
         except RuntimeError:
             pass
 
-        assert self.receiver._prepare_sqlite.called
-        assert self.receiver.sqliteconn.commit.called
+        assert self.sqliteconn.commit.called
         assert self.receiver.assert_parent_exists.called
 
 
@@ -208,7 +208,8 @@ class TestSensor(object):
             SensorConfig({'frequency': 1}),
             'config_id',
             'target',
-            'target_id'
+            'target_id',
+            MagicMock(),
         )
 
     def test_run(self):

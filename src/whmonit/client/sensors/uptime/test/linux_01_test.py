@@ -15,7 +15,7 @@ class TestClassUptime():
             '''Just an empty handler.'''
             pass
 
-        self.sensor = Sensor({"frequency": 10}, empty_handler)
+        self.sensor = Sensor({"frequency": 10}, empty_handler, {})
 
     def test_read_uptime(self):
         '''Test reading uptime.'''

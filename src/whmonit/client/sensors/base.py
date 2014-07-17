@@ -1,4 +1,5 @@
 # -*- encoding: utf-8 -*-
+import psutil
 from abc import abstractproperty, ABCMeta
 from nanotime import nanotime
 from voluptuous import Required, Schema, Optional, All, Range
@@ -86,18 +87,28 @@ class SensorBase(object):
         # TODO: documentation + field checking
 
     # TODO: config split -> internal_configuration, external_configuration
-    def __init__(self, config, send_results, config_id=None):
+    def __init__(self, config, send_results, storage, config_id=None):
         """
             Where:
             config: yaml
             send_results: callback function to supply results.
+            storage: Dict-like object which sensor can
+                     use to store/retrieve persistent data.
+                     Mostly for AdvancedSensors.
         """
+
+        # Make sensor process behave nice on the CPU.
+        proc = psutil.Process()
+        proc.nice(19)
+        proc.ionice(psutil.IOPRIO_CLASS_IDLE)
+
         self.config = None
         self.reload(config)
         self._self_checks()
         if not send_results:
             raise SensorError("I need sendresults method as a parm!")
         self.send_results = send_results
+        self.storage = storage
         self.config_id = config_id
 
     def reload(self, config):

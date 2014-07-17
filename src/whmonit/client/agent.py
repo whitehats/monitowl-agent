@@ -4,6 +4,8 @@
 Agent - software that runs on client machine, runs sensors as scheduled, sends
     them raw to collector (over http).
 '''
+# Too many lines in module
+# pylint: disable=C0302
 
 import os
 import sys
@@ -13,6 +15,7 @@ if sys.version_info.major != 2 or sys.version_info.minor < 7:
     sys.exit(1)
 
 try:
+    import signal
     import json
     import sqlite3
     import importlib
@@ -29,6 +32,7 @@ try:
     from functools import partial
     from furl import furl
     from interruptingcow import timeout
+    from multiprocessing.managers import SyncManager
 except ImportError as ex:
     print >> sys.stderr, '{}. Please install it or check documentation ' \
                          'for more information.'.format(ex)
@@ -85,46 +89,16 @@ class AgentInternal(multiprocessing.Process):
 
     __metaclass__ = ABCMeta
 
-    def __init__(self, database_path, *args, **kwargs):
+    def __init__(self, *args, **kwargs):
         super(AgentInternal, self).__init__(*args, **kwargs)
         self.log = logging.getLogger('monitowl.client.{}'.format(
             self.__class__.__name__
         ))
         self.process = None
         self.serializer = JSONTypeRegistrySerializer(TYPE_REGISTRY)
-        self.database_path = database_path
         self.ppid = None
-
-        self.sqliteconn = self._prepare_sqlite()
-
-    def _prepare_sqlite(self):
-        '''
-        Creates sql database.
-        '''
-        if not os.path.exists(self.database_path):
-            self.log.debug(
-                'Could not find old sensordata db - creating new one')
-
-            connection = sqlite3.connect(self.database_path, timeout=60,
-                                         check_same_thread=False)
-            cursor = connection.cursor()
-
-            cursor.execute('PRAGMA auto_vacuum = FULL')
-            cursor.execute('CREATE TABLE sensordata (stamp TEXT, config_id '
-                           'TEXT, stream TEXT, result TEXT)')
-            cursor.execute('CREATE INDEX index_id on sensordata (config_id);')
-        else:
-            self.log.debug('Found old sensordata database ({}) - using it'
-                           .format(self.database_path))
-            connection = sqlite3.connect(self.database_path, timeout=60,
-                                         check_same_thread=False)
-
-            # check integrity of existing database
-            cursor = connection.cursor()
-            cursor.execute('PRAGMA integrity_check')
-
-        connection.commit()
-        return connection
+        self.running = multiprocessing.Event()
+        self.running.set()
 
     def assert_parent_exists(self):
         '''
@@ -138,9 +112,90 @@ class AgentInternal(multiprocessing.Process):
         '''
         Run process to do its job.
         '''
+        signal.signal(signal.SIGINT, signal.SIG_IGN)
+        signal.signal(signal.SIGTERM, signal.SIG_DFL)
+
         procname.setprocname(self.name)
         self.process = psutil.Process(self.pid)
         self.ppid = self.process.ppid()
+
+    def stop(self):
+        '''
+        Stops process execution in a gently manner.
+        '''
+        self.running.clear()
+
+
+class StorageManager(object):
+    '''
+    Manager for per sensor persistent storage.
+
+    Uses `multiprocessing.managers.SyncManager` to give sensors access
+    to a dict-like structure, which automagically synchronizes with
+    the main process.
+
+    Values are stored in sqlite as stringified JSON documents.
+    '''
+    def __init__(self, sqliteconn):
+        '''
+        Initializes sync manager and logger.
+        '''
+        self.log = logging.getLogger('monitowl.client.{}'.format(
+            self.__class__.__name__
+        ))
+        self.storages = {}
+        self.manager = SyncManager()
+        self.manager.start(
+            lambda: signal.signal(signal.SIGINT, signal.SIG_IGN)
+        )
+
+        self.ppid = None
+
+        self.sqliteconn = sqliteconn
+
+    def get_storage(self, name):
+        '''
+        Retrieves storage for given name. If such storage doesn't exist,
+        a new one, possibly with data got from sqlite, will be created.
+
+        Note that name is not necessarily sensor's name. In fact,
+        most of the time it will be sensor_name+hash(sensor_config).
+        This way we can differentiate storages within one sensor type.
+        '''
+        self.log.debug('Storage requested for `{}`'.format(name))
+
+        if name in self.storages:
+            return self.storages[name]
+
+        cursor = self.sqliteconn.cursor()
+        cursor.execute("SELECT value FROM sensorstorage WHERE key=?", (name,))
+        try:
+            storage_data = json.loads(cursor.fetchone())
+        # Catching too general exception
+        # pylint: disable=W0703
+        except Exception:
+            storage_data = {}
+        # Instance of 'SyncManager' has no 'dict' member
+        # pylint: disable=E1101
+        self.storages[name] = self.manager.dict(storage_data)
+        return self.storages[name]
+
+    def shutdown(self):
+        '''
+        Flushes all remaining storages into sqlite
+        and shuts down manager.
+        '''
+        self.log.debug('Shutting down storage manager')
+
+        cursor = self.sqliteconn.cursor()
+        for sensor, store in self.storages.iteritems():
+            cursor.execute(
+                'INSERT OR REPLACE INTO sensorstorage'
+                ' (key, value) VALUES (?,?)',
+                (sensor, json.dumps(dict(store))),
+            )
+        self.sqliteconn.commit()
+        self.manager.shutdown()
 
 
 class Sensor(multiprocessing.Process):
@@ -154,7 +209,7 @@ class Sensor(multiprocessing.Process):
 
     proc_name = 'monitowl.sensor.{}'
 
-    def __init__(self, queue, sensor, config, config_id, target, target_id):
+    def __init__(self, queue, sensor, config, config_id, target, target_id, storage):
         '''
         Here we initialize Sensor class.
         '''
@@ -177,11 +232,18 @@ class Sensor(multiprocessing.Process):
         self.sensor_class = importlib.import_module(
             'whmonit.client.sensors.{}.linux_01'.format(self.sensor),
         ).Sensor
+        self.running = multiprocessing.Event()
+        self.running.set()
+
+        self.storage = storage
 
     def run(self):
         '''
         Let the sensor run according to configuration.
         '''
+        signal.signal(signal.SIGINT, signal.SIG_IGN)
+        signal.signal(signal.SIGTERM, signal.SIG_DFL)
+
         procname.setprocname(self.name)
         self.process = psutil.Process(self.pid)
         self.ppid = self.process.ppid()
@@ -199,12 +261,12 @@ class Sensor(multiprocessing.Process):
             self.config = SensorConfig(self.config)
 
         sensor_instance = self.sensor_class(
-            self.config, send_results, self.config_id
+            self.config, send_results, self.storage, self.config_id
         )
         if isinstance(sensor_instance, TaskSensorBase):
             runtime = time.time()
 
-            while True:
+            while self.running.is_set():
                 if self.do_config.is_set():
                     self.config = SensorConfig(self.config_queue.get())
                     self.log.debug('Reconfiguring sensor {} {}'.format(
@@ -252,6 +314,15 @@ class Sensor(multiprocessing.Process):
             self.log.error('Sensor {} is a child of unknown class {}, '
                            'will not run it.'
                            .format(self.sensor_class.__base__, self.sensor))
+
+    def stop(self):
+        '''
+        Stops sensor execution. Usually in a gently manner,
+        not so gently (SIGTERM) for AdvancedSensors.
+        '''
+        self.running.clear()
+        if issubclass(self.sensor_class, AdvancedSensorBase):
+            self.terminate()
 
     def send_results(self, sensor_class, timestamp, data):
         '''
@@ -323,14 +394,12 @@ class Receiver(AgentInternal):
         from multiprocessing.Queue and storing it in sqlite buffer.
     '''
 
-    def __init__(self, database_path, queue):
+    def __init__(self, sqliteconn, queue):
         '''
         Initialize variables, setup queue and sqlite.
         '''
-        super(Receiver, self).__init__(
-            database_path=database_path,
-            name='monitowl.receiver'
-        )
+        super(Receiver, self).__init__(name='monitowl.receiver')
+        self.sqliteconn = sqliteconn
         self.queue = queue
 
     def run(self):
@@ -339,7 +408,7 @@ class Receiver(AgentInternal):
         in local buffer (sqlite).
         '''
         super(Receiver, self).run()
-        while True:
+        while self.running.is_set():
             # Get data from sensors queue and store it in sqlite:
             # Wait 1 sec, then read from queue until it's empty.
             # This `hack` is necessary because using queue.get with timeout
@@ -375,14 +444,12 @@ class Shipper(AgentInternal):
     # R0902: Too many instance attributes
     # pylint: disable=R0902
 
-    def __init__(self, database_path, send_results):
+    def __init__(self, sqliteconn, send_results):
         '''
         Initialize variables, setup queue and sqlite connection.
         '''
-        super(Shipper, self).__init__(
-            database_path=database_path,
-            name='monitowl.shipper'
-        )
+        super(Shipper, self).__init__(name='monitowl.shipper')
+        self.sqliteconn = sqliteconn
         self.send_results = send_results
         self.sleeptime = 1.0
 
@@ -392,7 +459,7 @@ class Shipper(AgentInternal):
     def run(self):
         super(Shipper, self).run()
 
-        while True:
+        while self.running.is_set():
             # Get data from sqlite and send it to collector.
             time.sleep(self.sleeptime)
             cursor = self.sqliteconn.cursor()
@@ -533,7 +600,6 @@ class Agent(object):
         self.agent_name = agent_name
         self.serveraddr = server_address
         self.webapi_address = webapi_address
-        self.sqlite_path = sqlite_path
         self.certs_dir = certs_dir
         self.csr_path = os.path.join(self.certs_dir, 'agent.csr')
         self.crt_path = os.path.join(self.certs_dir, 'agent.crt')
@@ -546,6 +612,50 @@ class Agent(object):
         self.make_request = self._make_requests_wrapper()
         self.load_config()
         self._subprocesses = []
+
+        self.sqliteconn = self._prepare_sqlite(sqlite_path)
+
+        self.storage_manager = StorageManager(self.sqliteconn)
+
+        signal.signal(signal.SIGTERM, self.terminate)
+        signal.signal(signal.SIGINT, self.terminate)
+
+        self.running = True
+
+    def _prepare_sqlite(self, dbpath):
+        '''
+        Creates sql database.
+        '''
+        connection = sqlite3.connect(
+            dbpath,
+            timeout=60,
+            check_same_thread=False
+        )
+        cursor = connection.cursor()
+
+        self.log.debug('Connecting to sensordata db at {}'.format(dbpath))
+
+        cursor.execute('PRAGMA auto_vacuum = FULL')
+        cursor.execute(
+            'CREATE TABLE IF NOT EXISTS sensordata (stamp TEXT, config_id '
+            'TEXT, stream TEXT, result TEXT)'
+        )
+        cursor.execute(
+            'CREATE TABLE IF NOT EXISTS sensorstorage (key TEXT, value TEXT)'
+        )
+        cursor.execute(
+            'CREATE INDEX IF NOT EXISTS index_id on sensordata (config_id);'
+        )
+        cursor.execute(
+            'CREATE UNIQUE INDEX IF NOT EXISTS '
+            'storage_key on sensorstorage (key)'
+        )
+
+        # check integrity of existing database
+        cursor.execute('PRAGMA integrity_check')
+
+        connection.commit()
+        return connection
 
     def check_connection(self):
         '''
@@ -726,12 +836,12 @@ class Agent(object):
             furl(self.serveraddr).join('store_data').url
         )
         # Spawn processes for data transfer.
-        self._start_subprocess(Receiver, (self.sqlite_path, self._queue))
-        self._start_subprocess(Shipper, (self.sqlite_path, send_results))
+        self._start_subprocess(Receiver, (self.sqliteconn, self._queue))
+        self._start_subprocess(Shipper, (self.sqliteconn, send_results))
 
         # Periodically check child processes and restart them if needed.
         recheck_config_timeout = 1
-        while True:
+        while self.running:
             recheck_config_timeout -= 1
             if not recheck_config_timeout:
                 self.get_remote_config()
@@ -765,6 +875,7 @@ class Agent(object):
                         pass
                 if not process.is_alive():
                     self._restart_subprocess(process)
+        self.cleanup()
 
     def _spawn_sensors(self):
         '''
@@ -808,6 +919,9 @@ class Agent(object):
             # We want to pass original config to Sensor,
             # because AdvancedSensors don't have "standard" settings.
             memory_limit = SensorConfig(config)['memory_limit']
+            storage = self.storage_manager.get_storage("{}:{}".format(
+                sensor['sensor'], config_id,
+            ))
             self._start_subprocess(
                 Sensor, (
                     self._queue,
@@ -816,6 +930,7 @@ class Agent(object):
                     config_id,
                     sensor['target'],
                     sensor['target_id'],
+                    storage,
                 ), memory_limit=memory_limit,
             )
 
@@ -891,3 +1006,20 @@ class Agent(object):
                                       instance.proc_args,
                                       instance.proc_kwargs,
                                       instance.memory_limit)
+
+    def terminate(self, signum, frame):
+        '''
+        Handles termination signal.
+        '''
+        del signum, frame
+
+        self.running = False
+
+    def cleanup(self):
+        '''
+        Cleans up environment. Called after main loop has exited.
+        Requests termination on sensors.
+        '''
+        for subprocess in self._subprocesses:
+            subprocess.stop()
+        self.storage_manager.shutdown()

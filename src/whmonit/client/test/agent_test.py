@@ -3,6 +3,7 @@ Agent tests
 """
 
 from unittest import TestCase, skip
+from mock import MagicMock, patch
 from whmonit.client.agent import Agent, Sensor
 import time
 import os
@@ -10,6 +11,7 @@ import multiprocessing
 import BaseHTTPServer
 
 
+@patch('whmonit.client.agent.StorageManager', MagicMock())
 class AgentTest(TestCase):
     # too many public methods
     # pylint: disable=R0904
@@ -73,7 +75,8 @@ class SensorTest(TestCase):
             {"frequency": 1, 'run_timeout': 5},
             "config_id",
             "target",
-            "target_id"
+            "target_id",
+            MagicMock(),
         )
 
     def test_runsensor(self):

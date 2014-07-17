@@ -199,8 +199,8 @@ def main(args):
         print >> sys.stderr, "Please use --help to list avalible options."
         sys.exit(1)
 
-    if not args.server_address:
-        print >> sys.stderr, "Please specify server address (-s)."
+    if not args.server_address or not args.webapi_address:
+        print >> sys.stderr, "Please specify server urls (--collector-url and --webapi-url)."
         sys.exit(1)
 
     if args.action == 'initialize':
