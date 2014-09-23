@@ -7,11 +7,12 @@ websocket-client==0.15.0
 enum34==1.0
 requests==2.3.0
 furl==0.3.93
-voluptuous==0.8.5
 pyyaml
-sh==1.09
-RPi.GPIO==0.5.5
-procname==0.3
-psutil==2.1.1
 pyOpenSSL==0.14
+jsonschema==2.3.0
+pika==0.9.14
+sh==1.09
+setproctitle==1.1.8
+psutil==2.1.1
 interruptingcow==0.6
+Monotime==1.0

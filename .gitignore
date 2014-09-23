@@ -50,3 +50,8 @@ src/whmonit/webclient/.sass-cache/
 .settings
 
 src/.pants.d/
+
+.vagrant/
+
+build
+configuration.please.change.me
