@@ -1,29 +1,28 @@
 # -*- encoding: utf-8 -*-
+import inspect
 import psutil
+import re
 import sys
-from abc import abstractproperty, ABCMeta
+from abc import abstractproperty
 from copy import deepcopy
 from datetime import datetime
 from jsonschema import ValidationError
 
+from whmonit.common.enums import INTERNAL_SENSORS
+from whmonit.common.metaclasses import BaseCheckMeta, CheckException
+from whmonit.common.types import PRIMITIVE_TYPE_REGISTRY
 from whmonit.common.validators import ValidatorWithDefault
 
 
-__all__ = ['Sensor']
+class InvalidDataError(Exception):
+    '''Coding error: invalid stream_name, or datatype in stream.'''
 
 
-class SensorBaseError(Exception):
-    '''Base class for sensor errors.
-
-    Message of this class errors will be logged to sensor error channel.
-    '''
+class InvalidSendResultsError(Exception):
+    '''Sensor instance received an invalid (not callable) send_results method.'''
 
 
-class ConfigurationError(Exception):
-    '''Sensor configuration error.'''
-
-
-class SensorBaseMeta(ABCMeta):
+class SensorBaseMeta(BaseCheckMeta):
     '''
     Metaclass for :py:class:`SensorBase`:.
     Validates Sensor schema, calculates complete config schema
@@ -62,7 +61,82 @@ class SensorBaseMeta(ABCMeta):
             )
             schema = parent_schema
         dct['config_schema'] = schema
-        return ABCMeta.__new__(mcs, clsname, bases, dct)
+        return super(SensorBaseMeta, mcs).__new__(mcs, clsname, bases, dct)
+
+    def __init__(cls, clsname, bases, dct):
+        '''
+        Initialization step for base sensor class.
+
+        Adds 'error' stream to the streams list.
+        '''
+        if not inspect.isabstract(cls):
+            dct['streams']['error'] = {
+                'type': str, 'description': 'Error stream.',
+            }
+        super(SensorBaseMeta, cls).__init__(clsname, bases, dct)
+
+    @staticmethod
+    def check_name(clsname, cls, dct, **dummy):
+        '''
+        Check if sensor's name is correct - maximum 32 characters.
+        '''
+        if inspect.isabstract(cls):
+            return
+        name = dct['name']
+        if not re.match('^\\w{1,32}$', name):
+            yield CheckException(
+                "{}.name: `{}` doesn't match '^\\w{1,32}$'".format(clsname, name)
+            )
+        if name in INTERNAL_SENSORS:
+            yield CheckException(
+                '{}.name cannot be `{}`'.format(clsname, name)
+            )
+
+    @staticmethod
+    def check_streams(clsname, cls, dct, **dummy):
+        '''
+        Check if Sensor's stream names are of length 32 or less
+        and stream types are dicts with:
+         'type': of type :ref:`primitive <primitives>`
+         'description': of type :ref:`str`
+        '''
+        if inspect.isabstract(cls):
+            return
+        for name, return_type in dct['streams'].iteritems():
+            if not re.match('^\\w{1,32}$', name):
+                yield CheckException(
+                    "{}.streams' name: `{}` can only contain '\\w' characters "
+                    "and can't be longer then 32.".format(clsname, name)
+                )
+            if not isinstance(return_type, dict):
+                yield CheckException(
+                    "{}.streams' type_info: `{}` is not a dictionary"
+                    .format(clsname, return_type)
+                )
+                return
+            if 'type' not in return_type or 'description' not in return_type:
+                yield CheckException(
+                    "{}.streams' type: `{}` is not a proper dictionary "
+                    "with 'type' and 'description'".format(clsname, return_type)
+                )
+                return
+            if return_type['type'] not in PRIMITIVE_TYPE_REGISTRY:
+                yield CheckException(
+                    "{}.streams['type_info']['type'] type: `{}` is not one of "
+                    "PRIMITIVE_TYPE_REGISTRY".format(clsname, return_type['type'])
+                )
+            desc = return_type['description']
+            if not isinstance(desc, str):
+                yield CheckException(
+                    "{}.streams['type_info']['description']: `{}` is not a string"
+                    .format(clsname, desc)
+                )
+            elif desc[-1] != '.' or not desc[0].isupper():
+                yield CheckException(
+                    "{}.streams['type_info']['description']: `{}` "
+                    "should start with an uppercase and end with fullstop"
+                    .format(clsname, desc)
+                )
 
 
 # Method %r is abstract in class %r but is not overridden.
@@ -73,6 +147,9 @@ class SensorBase(object):
     Base class for all sensors in the system.
 
     This module provides base core for making sensors.
+
+    config_schema is a JSONSchema for Sensor configuration.
+        All schemas should validate dictionaries (objects).
 
     .. note::
             All global imports must not include additional requirements
@@ -88,15 +165,12 @@ class SensorBase(object):
     ``__init__``
     '''
     __metaclass__ = SensorBaseMeta
-    # TODO #1428: field checking can be implemented in metaclass
 
     config_schema = {}
-    # TODO #1428: documentation + field checking
 
     @abstractproperty
     def name(self):
-        '''Sensor's name. Max 16 chars.'''
-        # TODO #1428: documentation + field checking
+        '''Sensor's name. Max 32 chars, must match ^\\w{1,32}$'''
         pass
 
     @abstractproperty
@@ -105,9 +179,11 @@ class SensorBase(object):
         Sensor's streams.
 
         Sensor streams are defined as python :obj:`dict` (:class:`SensorBase.streams`)
-        where keys are `names` (max. 16 character string) and values are corresponding
-        :ref:`primitives`. Sensor can produce data associated with one of its
-        streams (the data must be of type defined by associated stream).
+        where keys are `names` (max. 32 character string) and values are dictionaries with two keys:
+            'type' - corresponding :ref:`primitives`.
+                Sensor can produce data associated with one of its
+                streams (the data must be of type defined by associated stream).
+            'description' - description of the stream
 
         The idea behind stream types is to allow each stream (each :ref:`primitive
         <primitives>`) to be handled efficiently during transfer over a network and
@@ -123,14 +199,19 @@ class SensorBase(object):
         Example streams definition for cpu sensor::
 
             {
-                'cpu': CPUTuple,
-                'my_stream': float,
+                'cpu': {
+                    'type': CPUTuple,
+                    'description': 'cpu stream description'
+                },
+                'my_stream': {
+                    'type': float,
+                    'description': 'my_stream description'
+                }
             }
 
         This example is valid as long as `CPUTuple` is defined as :ref:`primitive
         <primitives>`.
         '''
-        # TODO #1428: documentation + field checking
 
     def __init__(self, config, send_results, storage, config_id=None):
         '''
@@ -152,15 +233,12 @@ class SensorBase(object):
             proc.ionice(0)
 
         self.config = None
-        if not send_results:
-            raise SensorError("I need send_results method as a param!")
-        self.send_results = send_results
+        if not callable(send_results):
+            raise InvalidSendResultsError("send_results param is not callable")
+        self.do_send_results = send_results
         self.reload(config)
-        self._self_checks()
         self.storage = storage
         self.config_id = config_id
-        # add error stream
-        self.__class__.streams['error'] = str
 
     @classmethod
     def validate_config(cls, config):
@@ -181,24 +259,50 @@ class SensorBase(object):
             # This should never happen in run time, it's a coding error
             # and should be caught in tests.
             self.log(
-                'error while merging schemas: config_schema in class `{}`'
-                '''should be valid against `meta_schema`
-                {}'''.format(self.__class__.__name__, err.message)
+                'Error while merging schemas: config_schema in class `{}` '
+                'should be valid against `meta_schema` `{}`'
+                .format(self.__class__.__name__, err.message)
             )
             raise err
 
-    def _self_checks(self):
-        '''Checks if sensor's name is correct.'''
-        import re
-        from whmonit.common.enums import INTERNAL_SENSORS
-        # check name
-        if not re.match('\w+', self.name):
-            raise ConfigurationError("Sensor's name does not match to \w+")
-        if self.name in INTERNAL_SENSORS:
-            raise ConfigurationError(
-                "Sensor's name cannot be `{}`"
-                .format(self.name)
-            )
+    def send_results(self, timestamp, data):
+        '''
+        do_send_results wrapper.
+        Performs basic checks and calls do_send_results:
+            * Is ``stream`` a valid name?
+            * Is datatype secified by ``stream`` valid?
+        If any of above checks fails, data is ignored.
+        '''
+        for stream, output in data:
+            if stream not in self.streams:
+                raise InvalidDataError(
+                    "Sensor `{}` doesn't have stream `{}`. "
+                    'Data ignored.'.format(self.__class__.name, stream)
+                )
+            stream_type = self.streams[stream]['type']
+            if not isinstance(output, stream_type):
+                raise InvalidDataError(
+                    "Datatype returned by sensor `{}` doesn't match "
+                    'datatype declared in stream `{}`. Got {!r}, '
+                    'expected `{!r}`. Data ignored.'
+                    .format(
+                        self.__class__.name,
+                        stream,
+                        type(output),
+                        stream_type
+                    )
+                )
+            if not PRIMITIVE_TYPE_REGISTRY.is_valid_type(stream_type):
+                raise InvalidDataError(
+                    'Datatype {!r} of stream `{}` in sensor `{}` is not '
+                    'valid *primitive*. Data ignored.'
+                    .format(
+                        stream_type,
+                        stream,
+                        self.__class__.name
+                    )
+                )
+        self.do_send_results(timestamp, data)
 
     def do_run(self):
         '''

@@ -17,7 +17,12 @@ class Sensor(TaskSensorBase):
     # pylint: disable=W0232,E1101,R0903
 
     name = 'processes'
-    streams = {'default': str}
+    streams = {
+        'default': {
+            'type': str,
+            'description': 'List of running processes.'
+        }
+    }
     fields = ('pid', 'comm', 'state', 'ppid', 'pgrp', 'session', 'tty_nr',
               'tpgid', 'flags', 'minflt', 'cminflt', 'majflt', 'cmajflt',
               'utime', 'stime', 'cutime', 'cstime', 'priority', 'nice',

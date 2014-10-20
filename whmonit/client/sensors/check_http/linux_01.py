@@ -18,10 +18,20 @@ class Sensor(TaskSensorBase):
 
     name = 'check_http'
     streams = {
-        'status_code': float,
-        'status_text': str,
-        'response_time': float,
+        'status_code': {
+            'type': float,
+            'description': 'Status code of the HTTP connection.'
+        },
+        'status_text': {
+            'type': str,
+            'description': 'Status text.'
+        },
+        'response_time': {
+            'type': float,
+            'description': 'Response time.'
+        }
     }
+
     config_schema = {
         '$schema': 'http://json-schema.org/schema#',
         'type': 'object',

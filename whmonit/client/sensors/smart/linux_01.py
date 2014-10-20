@@ -17,29 +17,47 @@ class Sensor(TaskSensorBase):
 
     name = 'smart'
 
-    # float values:
-    # raw_value:   Vendor-specific raw value of the attribute (eg. time in hours or minutes)
-    # value:       The value normalized according to disk's firmware. It's in range from
-    #              1 to 255. If it's less than 'threshold', the attribute has failed
-    # worst:       the lowest normalized value recorded since SMART was enabled
-    # bool values (from manual):
-    # disk_failing:      SMART status check returned "DISK FAILING:
-    # below_thresh:      some attributes are below threshold (that is are failing)
-    # below_thresh_past: status check returned "DISK OK" but some attributes
-    #                    were below threshold in the past (that is were failing but aren't now)
-    # err_log:           there are errors in error log
-    # selftest_err_log:  self-test log contains errors
-    #                    (new results from self-test override previous)
     streams = {
-        'value': float,
-        'worst': float,
-        'threshold': float,
-        'raw_value': float,
-        'disk_failing': bool,
-        'below_thresh': bool,
-        'below_thresh_past': bool,
-        'err_log': bool,
-        'selftest_err_log': bool
+        'value': {
+            'type': float,
+            'description': "The value normalized according to disk's firmware. It's in range from "
+                           "1 to 255. If it's less than 'threshold', the attribute has failed."
+        },
+        'worst': {
+            'type': float,
+            'description': "The lowest normalized value recorded since SMART was enabled."
+        },
+        'threshold': {
+            'type': float,
+            'description': "Threshold."
+        },
+        'raw_value': {
+            'type': float,
+            'description': "Vendor-specific raw value of the attribute "
+                           "(eg. time in hours or minutes)."
+        },
+        'disk_failing': {
+            'type': bool,
+            'description': "SMART status check returned 'DISK FAILING'."
+        },
+        'below_thresh': {
+            'type': bool,
+            'description': "Some attributes are below threshold (that is are failing)."
+        },
+        'below_thresh_past': {
+            'type': bool,
+            'description': "Status check returned 'DISK OK' but some attributes "
+                           "were below threshold in the past (that is were failing but aren't now)."
+        },
+        'err_log': {
+            'type': bool,
+            'description': "There are errors in error log."
+        },
+        'selftest_err_log': {
+            'type': bool,
+            'description': "Self-test log contains errors "
+                           "(new results from self-test override previous)."
+        }
     }
 
     config_schema = {

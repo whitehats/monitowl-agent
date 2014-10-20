@@ -17,7 +17,12 @@ class Sensor(TaskSensorBase):
     # pylint: disable=W0232,R0201,R0903
 
     name = 'uptime'
-    streams = {'default': float}
+    streams = {
+        'default': {
+            'type': float,
+            'description': 'System uptime.'
+        }
+    }
 
     def do_run(self):
         '''Returns system uptime.'''

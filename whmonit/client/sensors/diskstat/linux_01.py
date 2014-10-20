@@ -11,12 +11,32 @@ class Sensor(TaskSensorBase):
     # pylint: disable=W0232,R0201,R0903
 
     name = 'diskstat'
-    streams = {'read_bytes': float,
-               'write_bytes': float,
-               'read_count': float,
-               'write_count': float,
-               'read_time': float,
-               'write_time': float}
+    streams = {
+        'read_bytes': {
+            'type': float,
+            'description': 'Number of bytes read.'
+        },
+        'write_bytes': {
+            'type': float,
+            'description': 'Number of bytes written.'
+        },
+        'read_count': {
+            'type': float,
+            'description': 'Number of reads.'
+        },
+        'write_count': {
+            'type': float,
+            'description': 'Number of writes.'
+        },
+        'read_time': {
+            'type': float,
+            'description': 'Time spent reading from disk (in milliseconds).'
+        },
+        'write_time': {
+            'type': float,
+            'description': 'Time spent writing to disk (in milliseconds).'
+        }
+    }
     config_schema = {
         '$schema': 'http://json-schema.org/schema#',
         'type': 'object',

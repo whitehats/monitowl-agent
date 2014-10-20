@@ -36,7 +36,7 @@ class TestCheckMetaclasses(object):
 
     def test_both_checks_fails(self):
         '''Test if both checks fail and both are yielded.'''
-        with pytest.raises(metaclasses.InvalidClassException) as err:
+        with pytest.raises(metaclasses.InvalidClassError) as err:
             class CustomClass(object):
                 '''Test class failing checks.'''
                 # R0903: Too few public methods
@@ -44,7 +44,7 @@ class TestCheckMetaclasses(object):
                 # pylint: disable=R0903,W0612
                 __metaclass__ = CustomMeta
 
-        assert len(err.value.check_errors) == 2
+        assert len(err.value.env['check_errors']) == 2
 
     def test_checks_pass(self):
         '''Check if proper class can pass checks.'''

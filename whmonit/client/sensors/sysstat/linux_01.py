@@ -11,9 +11,20 @@ class Sensor(TaskSensorBase):
     '''Cpu and memory sensor class.'''
 
     name = 'sysstat'
-    streams = {'proc_avg': float,
-               'vmem_perc': float,
-               'smem_perc': float}
+    streams = {
+        'proc_avg': {
+            'type': float,
+            'description': 'Processors usage percentage.'
+        },
+        'vmem_perc': {
+            'type': float,
+            'description': 'Virtual memory usage percentage.'
+        },
+        'smem_perc': {
+            'type': float,
+            'description': 'Swap memory usage percentage.'
+        }
+    }
 
     def do_run(self):
         '''Executes itself.'''

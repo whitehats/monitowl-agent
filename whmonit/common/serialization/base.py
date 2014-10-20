@@ -439,7 +439,7 @@ class TypeRegistrySerializationBase(object):
         struct_schema = '!HH{:d}s{:d}s'.format(len(schema),
                                                len(sdata))
         return struct.pack(struct_schema, int(self.signature), len(schema),
-                           schema, self.serialize(data))
+                           schema, sdata)
 
     def unpack(self, data):
         ''' Gets binary ``data``, checks if it contains data that can be

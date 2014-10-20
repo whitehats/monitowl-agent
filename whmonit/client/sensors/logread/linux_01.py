@@ -22,7 +22,12 @@ class Sensor(AdvancedSensorBase):
         'required': ['filename'],
         'additionalProperties': False
     }
-    streams = {'default': str}
+    streams = {
+        'default': {
+            'type': str,
+            'description': 'Logs from the file.'
+        }
+    }
 
     def do_run(self):
         '''

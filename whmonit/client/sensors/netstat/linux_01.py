@@ -12,14 +12,38 @@ class Sensor(TaskSensorBase):
 
     name = 'netstat'
     streams = {
-        'bytes_sent': float,
-        'bytes_recv': float,
-        'dropin': float,
-        'dropout': float,
-        'packets_recv': float,
-        'packets_sent': float,
-        'errin': float,
-        'errout': float,
+        'bytes_sent': {
+            'type': float,
+            'description': 'Number of bytes sent.'
+        },
+        'bytes_recv': {
+            'type': float,
+            'description': 'Number of bytes received.'
+        },
+        'dropin': {
+            'type': float,
+            'description': 'Total number of incoming packets.'
+        },
+        'dropout': {
+            'type': float,
+            'description': 'Total number of outgoing packets.'
+        },
+        'packets_recv': {
+            'type': float,
+            'description': 'Number of packets received.'
+        },
+        'packets_sent': {
+            'type': float,
+            'description': 'Number of packets sent.'
+        },
+        'errin': {
+            'type': float,
+            'description': 'Total number of errors while receiving.'
+        },
+        'errout': {
+            'type': float,
+            'description': 'Total number of errors while sending.'
+        }
     }
     config_schema = {
         '$schema': 'http://json-schema.org/schema#',

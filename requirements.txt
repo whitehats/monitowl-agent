@@ -16,3 +16,5 @@ setproctitle==1.1.8
 psutil==2.1.1
 interruptingcow==0.6
 Monotime==1.0
+dnspython==1.11.1
+pysnmp==4.2.5

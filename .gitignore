@@ -27,18 +27,24 @@ tools/.certs/*.crt
 tools/.certs/*.key
 tools/.certs/*.pem
 tools/.certs/index.txt*
+tools/.certs/index_agents.txt
 tools/.certs/serial
+tools/.certs/serial_agents
 tools/.certs/serial.old
+tools/.certs/*_passphrase
 
 tools/agent_public_repo/
 
 .agentconfig.json
+.agentconfig.yaml_example
 .agentdata.db
 agentconfig.yaml_nonexist
 
 src/services/rabbitmq.service
 src/services/redis.config
 src/services/celery.service
+
+src/data_ignored.trash
 
 src/whmonit/webclient/build/
 src/whmonit/webclient/docs/
@@ -52,6 +58,7 @@ src/whmonit/webclient/.sass-cache/
 src/.pants.d/
 
 .vagrant/
+vagrant_ansible_inventory_default
 
 build
 configuration.please.change.me

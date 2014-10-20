@@ -24,6 +24,7 @@ import time
 import threading
 from abc import ABCMeta, abstractmethod
 from functools import partial
+from itertools import izip
 from multiprocessing.managers import SyncManager
 try:
     import jsonschema
@@ -53,7 +54,9 @@ except ImportError as ex:
                          'for more information.'.format(ex)
     sys.exit(1)
 
-from whmonit.client.sensors import TaskSensorBase, AdvancedSensorBase
+from whmonit.client.sensors.base import (
+    TaskSensorBase, AdvancedSensorBase, InvalidDataError
+)
 from whmonit.common.log_handlers import AgentErrorLogHandler
 from whmonit.common.serialization.json import JSONTypeRegistrySerializer
 from whmonit.common.time import (
@@ -338,6 +341,8 @@ class Sensor(multiprocessing.Process):
         '''
         # SIGINT is ignored because it's 'inherited' and can cause that
         # all sensors will die if one of them gets sigint
+        # R0912: Too many branches
+        # pylint: disable=R0912
         signal.signal(signal.SIGINT, signal.SIG_IGN)
         signal.signal(signal.SIGTERM, signal.SIG_DFL)
 
@@ -360,63 +365,66 @@ class Sensor(multiprocessing.Process):
         sensor_instance = self.sensor_class(
             self.config, send_results, self.storage, self.config_id
         )
-        if isinstance(sensor_instance, TaskSensorBase):
-            runtime = timer()
-
-            while self.running.is_set():
-                if self.do_config.is_set():
-                    self.config = SensorConfig(self.config_queue.get())
-                    self.log.debug('Reconfiguring sensor {} {}'.format(
-                        self.sensor,
-                        self.config,
-                    ))
-                    sensor_instance.reload(self.config)
-                    self.do_config.clear()
-
-                # Calculate exact time when should be next run and sleep that
-                # time.
-                sleeptime = self.config['frequency'] - (timer() - runtime)
-                if sleeptime < 0:
-                    self.log.warning('We are behind the schedule ({} secs)!'
-                                     .format(sleeptime))
-                    sleeptime = 0
-                self.log.debug('Will run sensor {} in {} secs'.format(
-                    self.sensor,
-                    sleeptime
-                ))
-                if sleeptime > 0:
-                    time.sleep(sleeptime)
-
+        try:
+            if isinstance(sensor_instance, TaskSensorBase):
                 runtime = timer()
-                self.log.debug('Run sensor {}'.format(self.sensor))
 
-                # Setup a timeout.
-                try:
-                    if sys.platform in ['linux2', 'darwin']:
-                        with timeout(self.config['run_timeout'], TimeoutException):
-                            sensor_instance.run()
-                    else:
-                        timeout_on_windows(
-                            sensor_instance.run,
-                            self.config['run_timeout'],
-                            self.pid
-                        )
-                except TimeoutException:
-                    sys.exit(SENSOR_TIMEOUT_EXITCODE)
+                while self.running.is_set():
+                    if self.do_config.is_set():
+                        self.config = SensorConfig(self.config_queue.get())
+                        self.log.debug('Reconfiguring sensor {} {}'.format(
+                            self.sensor,
+                            self.config,
+                        ))
+                        sensor_instance.reload(self.config)
+                        self.do_config.clear()
 
-                # Check if parent changed or died (might raise
-                # psutil.NoSuchProcess exception).
-                if self.ppid != self.process.ppid():
-                    raise Exception('Parent changed')
+                    # Calculate exact time when should be next run and sleep that
+                    # time.
+                    sleeptime = self.config['frequency'] - (timer() - runtime)
+                    if sleeptime < 0:
+                        self.log.warning('We are behind the schedule ({} secs)!'
+                                         .format(sleeptime))
+                        sleeptime = 0
+                    self.log.debug('Will run sensor {} in {} secs'.format(
+                        self.sensor,
+                        sleeptime
+                    ))
+                    if sleeptime > 0:
+                        time.sleep(sleeptime)
 
-        elif isinstance(sensor_instance, AdvancedSensorBase):
-            # Pass the control to the sensor.
-            sensor_instance.run()
+                    runtime = timer()
+                    self.log.debug('Run sensor {}'.format(self.sensor))
 
-        else:
-            self.log.error('Sensor {} is a child of unknown class {}, '
-                           'will not run it.'
-                           .format(self.sensor_class.__base__, self.sensor))
+                    # Setup a timeout.
+                    try:
+                        if sys.platform in ['linux2', 'darwin']:
+                            with timeout(self.config['run_timeout'], TimeoutException):
+                                sensor_instance.run()
+                        else:
+                            timeout_on_windows(
+                                sensor_instance.run,
+                                self.config['run_timeout'],
+                                self.pid
+                            )
+                    except TimeoutException:
+                        sys.exit(SENSOR_TIMEOUT_EXITCODE)
+
+                    # Check if parent changed or died (might raise
+                    # psutil.NoSuchProcess exception).
+                    if self.ppid != self.process.ppid():
+                        raise Exception('Parent changed')
+
+            elif isinstance(sensor_instance, AdvancedSensorBase):
+                # Pass the control to the sensor.
+                sensor_instance.run()
+
+            else:
+                self.log.error('Sensor {} is a child of unknown class {}, '
+                               'will not run it.'
+                               .format(self.sensor_class.__base__, self.sensor))
+        except InvalidDataError as error:
+            self.log.error(error.message)
 
     def stop(self):
         '''
@@ -435,37 +443,10 @@ class Sensor(multiprocessing.Process):
         If any of above checks fails, data is being ignored.
         '''
         for stream, output in data:
-            if stream not in sensor_class.streams:
-                self.log.error('Sensor "{}" does not have stream "{}". '
-                               'Data ignored.'.format(sensor_class.name, stream))
-                continue
-            if not isinstance(output, sensor_class.streams[stream]):
-                self.log.error(
-                    'Datatype returned by sensor "{}" does not '
-                    'match datatype declared in stream "{}" '
-                    'got {!r}, expected {!r}. Data ignored.'
-                    .format(
-                        sensor_class.name,
-                        stream,
-                        type(output),
-                        sensor_class.streams[stream]
-                    )
-                )
-                continue
-            if not TYPE_REGISTRY.is_valid_type(sensor_class.streams[stream]):
-                self.log.error(
-                    'Datatype {!r} returned by sensor "{}" is not '
-                    'valid *primitive*. Data ignored.'
-                    .format(
-                        sensor_class.streams[stream],
-                        sensor_class.name
-                    )
-                )
-                continue
             msg = {
                 'config_id': self.config_id,
                 'data': output,
-                'datatype': sensor_class.streams[stream],
+                'datatype': sensor_class.streams[stream]['type'],
                 'timestamp': timestamp,
                 'stream_name': stream,
             }
@@ -581,8 +562,7 @@ class Shipper(AgentInternal):
                     self.log.debug('Maximum capacity reached')
 
                 req_list = AgentRequest()
-                ids_to_remove = []
-                stamps_to_remove = []
+                data_to_remove = []
                 for timestamp, config_id, stream, result in data:
                     req = AgentRequestChunk(
                         ID(config_id),
@@ -591,8 +571,7 @@ class Shipper(AgentInternal):
                         self.serializer.unpack(result)
                     )
                     req_list.append(req)
-                    ids_to_remove.append(config_id)
-                    stamps_to_remove.append(timestamp)
+                    data_to_remove.append((config_id, timestamp))
 
                 if req_list:
                     try:
@@ -601,8 +580,7 @@ class Shipper(AgentInternal):
                             {
                                 'response': partial(
                                     self._reqdone,
-                                    ids_to_remove,
-                                    stamps_to_remove,
+                                    data_to_remove,
                                     conn
                                 )
                             },
@@ -611,7 +589,7 @@ class Shipper(AgentInternal):
                         self.log.debug('Error while PUTing: {}'.format(ex))
                 self.assert_parent_exists()
 
-    def _reqdone(self, ids_to_remove, stamps_to_remove, conn, response, **_kwargs):
+    def _reqdone(self, data_to_remove, conn, response, **_kwargs):
         '''
         Requests hook function - run after request finish.
         '''
@@ -620,7 +598,6 @@ class Shipper(AgentInternal):
             self._confails = self._confails + 1
             if self._confails > 200:
                 self._confails = 200
-
             self.log.debug('Connection failed, _confails: {}'.format(self._confails))
             return
         elif response.status_code == 200:
@@ -633,14 +610,24 @@ class Shipper(AgentInternal):
             # status_code 400 - data was sent but collector ignored it
             # TODO #1145: Do not use `response status code` alone for
             #             communicating status of received data
+
+            try:
+                data_saved = json.loads(response.text)
+            except ValueError:
+                self.log.error('Received data are invalid.')
+                return
+            if data_saved['status'] == 'Not_all_saved':
+                data_to_remove = data_saved['data']
+
             cursor = conn.cursor()
             # This way of deleting rows might cause
             # OperationalError: too many SQL variables
-            cursor.execute('DELETE FROM sensordata WHERE config_id IN ({}) AND stamp IN ({})'
-                           .format(
-                               ', '.join('?' for _ in ids_to_remove),
-                               ', '.join('?' for _ in stamps_to_remove)
-                           ), ids_to_remove + stamps_to_remove)
+            data_placeholders = ('?,' * len(data_to_remove))[:-1]
+            cursor.execute(
+                'DELETE FROM sensordata WHERE config_id IN ({}) AND stamp IN ({})'.format(
+                    data_placeholders, data_placeholders
+                ), sum(izip(*data_to_remove), ())
+            )
             conn.commit()
         else:
             self.log.exception('POST problem, response status: {}'.format(

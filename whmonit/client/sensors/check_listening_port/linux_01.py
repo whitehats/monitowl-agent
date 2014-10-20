@@ -17,11 +17,26 @@ class Sensor(TaskSensorBase):
 
     name = 'check_listening_port'
     streams = {
-        'is_open': bool,
-        'pid': float,
-        'name': str,
-        'uid': float,
-        'user': str,
+        'is_open': {
+            'type': bool,
+            'description': 'True if port is opened, False otherwise.'
+        },
+        'pid': {
+            'type': float,
+            'description': 'PID of the process.'
+        },
+        'name': {
+            'type': str,
+            'description': 'Name of the process.'
+        },
+        'uid': {
+            'type': float,
+            'description': 'UID of process.'
+        },
+        'user': {
+            'type': str,
+            'description': 'Name of process owner.'
+        }
     }
     config_schema = {
         '$schema': 'http://json-schema.org/schema#',

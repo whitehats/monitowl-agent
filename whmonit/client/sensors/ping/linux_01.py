@@ -17,7 +17,14 @@ class Sensor(TaskSensorBase):
     # pylint: disable=W0232,R0201,R0903
 
     name = 'ping'
-    streams = {'default': float}
+    streams = {
+        'default': {
+            'type': float,
+            'description':
+                'Time from sending message to destination host '
+                'to receiving acknowledgment.'
+        }
+    }
     config_schema = {
         '$schema': 'http://json-schema.org/schema#',
         'type': 'object',

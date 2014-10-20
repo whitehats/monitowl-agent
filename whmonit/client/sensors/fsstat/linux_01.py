@@ -12,10 +12,22 @@ class Sensor(TaskSensorBase):
 
     name = 'fsstat'
     streams = {
-        'total': float,
-        'used': float,
-        'free': float,
-        'percent': float,
+        'total': {
+            'type': float,
+            'description': 'Total size of the disc.'
+        },
+        'used': {
+            'type': float,
+            'description': 'Used space of the disc.'
+        },
+        'free': {
+            'type': float,
+            'description': 'Free space of the disc.'
+        },
+        'percent': {
+            'type': float,
+            'description': 'Percentage usage of the disk.'
+        }
     }
     config_schema = {
         '$schema': 'http://json-schema.org/schema#',

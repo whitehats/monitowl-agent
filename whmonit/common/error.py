@@ -70,27 +70,32 @@ class ErrorType(type):
         if not name.endswith('Error'):
             raise BadError('''Exception's class name must end with "Error".''')
 
-        if 'params' not in dct and 'text' not in dct:
-            params = []
-            text = ''
-
-        elif 'params' not in dct:
-            raise BadError('You need to provide a `params` class member if '
-                           'you have `text`.')
-
-        elif 'text' not in dct:
-            raise BadError('You need to provide a `text` class member if you '
-                           'have `params`.')
-
-        else:
+        params = []
+        text_property = property(lambda self: '')
+        if 'params' in dct and 'text' in dct:
             if not isinstance(dct['params'], basestring):
                 raise BadError('`params` must be string.')
 
-            if not isinstance(dct['text'], basestring):
-                raise BadError('`text` must be string.')
+            text = dct['text']
+            if isinstance(text, basestring):
+                text_property = property(lambda self: text.format(**self.env))
+            elif isinstance(text, property):
+                text_property = text
+            else:
+                raise BadError('`text` must be string or property.')
 
             params = filter(len, re.split(',\s+', dct['params']))
-            text = dct['text']
+
+        elif 'text' in dct:
+            raise BadError('You need to provide a `params` class member if '
+                           'you have `text`.')
+
+        elif 'params' in dct:
+            raise BadError('You need to provide a `text` class member if you '
+                           'have `params`.')
+
+        if 'this_exception_class' in params:
+            raise BadError('You cannot use "this_exception_class" as param.')
 
         if '__init__' in dct:
             raise BadError('You cannot have an __init__ method.')
@@ -104,23 +109,23 @@ class ErrorType(type):
         code = '''def __init__(self{}, message=""):
             if not hasattr(self, 'initialized'):
                 self.message = message
-                self.text = {!r}
                 self.env = {{{}}}
                 try:
                     self.env.update(self.__class__.env)
                 except AttributeError:
                     pass
                 self.initialized = True
-            super(cls, self).__init__(str(self))
+            super(this_exception_class, self).__init__(str(self))
         '''.format(
-            params_init, text, params_dict
+            params_init, params_dict
         )
 
-        env = {'cls': cls}
+        env = {'this_exception_class': cls}
         exec code in env
 
+        cls.__init__ = env['__init__']
+        cls.text = text_property
         super(ErrorType, cls).__init__(name, bases, dct)
-        setattr(cls, '__init__', env['__init__'])
 
 
 class Error(Exception):
@@ -130,28 +135,28 @@ class Error(Exception):
 
     def __str__(self):
         try:
-            text = (self.__class__.__doc__.strip() + ' ' +
-                    self.text.format(**self.env))
+            text = self.__class__.__doc__.strip() + ' ' + self.text
             if self.message:
                 text += self.message
         except IndexError:
             # happens when the format string uses positional arguments instead
             # of keywords
-            text = ('{} (Warning: format string with positional arguments, ' +
+            text = ('{}\n\n\n\n(Warning: format string with positional arguments, ' +
                     'this is a bug in this exception! Format string: {!r},' +
                     'dictionary: {!r})').format(
                         self.__class__.__doc__.strip(),
                         self.text,
                         str(self.env))
 
-        text = re.sub('\s+', ' ', text).strip()
+        texts = text.split('\n\n')
+        for i in xrange(len(texts)):
+            texts[i] = re.sub('\s+', ' ', texts[i]).strip()
+            texts[i] = textwrap.fill(
+                texts[i],
+                initial_indent='' if i else ' ' * len(self.__class__.__name__))
+        texts[0] = texts[0][len(self.__class__.__name__):]
 
-        text = textwrap.fill(
-            text, initial_indent=' ' * len(self.__class__.__name__))
-
-        text = text.strip()
-
-        return text
+        return '\n'.join(texts)
 
 
 class ArgumentError(Error):

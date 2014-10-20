@@ -17,9 +17,18 @@ class Sensor(TaskSensorBase):
 
     name = 'check_port'
     streams = {
-        'is_open': bool,
-        'error_code': float,
-        'error_text': str,
+        'is_open': {
+            'type': bool,
+            'description': 'True if port is opened, False otherwise.'
+        },
+        'error_code': {
+            'type': float,
+            'description': 'Error code.'
+        },
+        'error_text': {
+            'type': str,
+            'description': 'Error message.'
+        }
     }
     config_schema = {
         '$schema': 'http://json-schema.org/schema#',

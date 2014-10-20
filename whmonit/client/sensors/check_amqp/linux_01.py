@@ -12,7 +12,10 @@ class Sensor(TaskSensorBase):
     """
     name = 'check_amqp'
     streams = {
-        'queue_depth': float,
+        'queue_depth': {
+            'type': float,
+            'description': 'Depth of queue in amqp server.'
+        }
     }
     config_schema = {
         '$schema': 'http://json-schema.org/schema#',

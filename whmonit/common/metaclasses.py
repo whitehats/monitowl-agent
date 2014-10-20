@@ -6,6 +6,9 @@ Common metaclasses.
 from abc import ABCMeta
 
 
+from whmonit.common.error import Error
+
+
 class CheckException(object):
     ''' Exception raised on failed check on component class. '''
     def __init__(self, error_msg):
@@ -13,24 +16,21 @@ class CheckException(object):
         self.message = error_msg
         self.check_name = None
 
-    def __repr__(self):
-        ''' Returns string representation of object. '''
-        return '{} | {}'.format(self.check_name, self.message)
-
-
-class InvalidClassException(Exception):
-    ''' Derived class assumptions broken. '''
-    def __init__(self, _cls, check_errors):
-        ''' Constructor for InvalidClassException. '''
-        super(InvalidClassException, self).__init__()
-        self._cls = _cls
-        self.check_errors = check_errors
-
     def __str__(self):
         ''' Returns string representation of object. '''
-        return 'Class {} is not valid.\n{}'.format(
-            self._cls,
-            '\n'.join(str(error) for error in self.errors)
+        return '{}: {}'.format(self.check_name, self.message)
+
+
+class InvalidClassError(Error):
+    ''' Derived class assumptions broken. '''
+    params = 'cls, check_errors'
+
+    @property
+    def text(self):
+        ''' Prepare text content for the exception. '''
+        return 'Class {} breaks the following assumptions:{}'.format(
+            self.env['cls'],
+            ''.join('\n\n' + str(error) for error in self.env['check_errors'])
         )
 
 
@@ -67,4 +67,4 @@ class BaseCheckMeta(ABCMeta):
                 error.check_name = func.func_name
                 errors.append(error)
         if errors:
-            raise InvalidClassException(_cls=cls, check_errors=errors)
+            raise InvalidClassError(cls=cls, check_errors=errors)

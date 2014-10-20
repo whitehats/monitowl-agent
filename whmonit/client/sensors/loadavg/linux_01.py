@@ -15,7 +15,13 @@ class Sensor(TaskSensorBase):
     # pylint: disable=W0232,R0201,R0903
 
     name = 'loadavg'
-    streams = {'default': float}
+    streams = {
+        'default': {
+            'type': float,
+            'description': 'The number of processes in the system run queue '
+                           'averaged over the last minute.'
+        }
+    }
 
     def do_run(self):
         return (("default", float(os.getloadavg()[0])),)

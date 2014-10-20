@@ -2,6 +2,7 @@
 '''Cpuinfo sensor.'''
 import platform
 import psutil
+
 from whmonit.client.sensors.base import TaskSensorBase
 
 
@@ -9,10 +10,22 @@ class Sensor(TaskSensorBase):
     '''Read processor information from /proc/cpuinfo.'''
     name = 'cpuinfo'
     streams = {
-        'name': str,
-        'cpu_count': float,
-        'cpu_percent': float,
-        'cpu_times': float
+        'name': {
+            'type': str,
+            'description': 'Processor name.'
+        },
+        'cpu_count': {
+            'type': float,
+            'description': 'Number of CPUs.'
+        },
+        'cpu_percent': {
+            'type': float,
+            'description': 'Percent of CPU usage.'
+        },
+        'cpu_times': {
+            'type': float,
+            'description': 'CPU times.'
+        }
     }
 
     def do_run(self):
