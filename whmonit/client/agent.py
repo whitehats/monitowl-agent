@@ -14,9 +14,9 @@ import datetime
 import hashlib
 import importlib
 import json
-import logging
 import multiprocessing
 import os
+import re
 import signal
 import ssl
 import sqlite3
@@ -26,6 +26,11 @@ from abc import ABCMeta, abstractmethod
 from functools import partial
 from itertools import izip
 from multiprocessing.managers import SyncManager
+from OpenSSL import crypto
+from Crypto.Util import asn1
+
+# Kenji: I'm taking dispense from our formatting guide, we need this here.
+from whmonit.common.log import AgentErrorLogHandler, getLogger
 try:
     import jsonschema
     import psutil
@@ -44,7 +49,7 @@ try:
     else:
         setproctitle = lambda x: x
         from time import time as timer
-        logging.getLogger('monitowl.client.Agent').debug(
+        getLogger('client.Agent').debug(
             "Your platform {} doesn't support monotonic clock,"
             " using normal clock. During time changes it may misbehave.".format(sys.platform)
         )
@@ -57,7 +62,6 @@ except ImportError as ex:
 from whmonit.client.sensors.base import (
     TaskSensorBase, AdvancedSensorBase, InvalidDataError
 )
-from whmonit.common.log_handlers import AgentErrorLogHandler
 from whmonit.common.serialization.json import JSONTypeRegistrySerializer
 from whmonit.common.time import (
     milliseconds_to_datetime, MillisecondTimestampRangeError
@@ -141,7 +145,7 @@ def timeout_on_windows(func, time_out, pid):
 def logger(name):
     ''' Wrapper logging.getLoger
     '''
-    return logging.getLogger('monitowl.client.{}'.format(name))
+    return getLogger('client.{}'.format(name))
 
 
 def make_sqlite_conn(dbpath):
@@ -549,7 +553,7 @@ class Shipper(AgentInternal):
                 cursor = conn.cursor()
                 # LIMIT is set due to possible DELETE problem
                 # OperationalError: too many SQL variables
-                cursor.execute('SELECT * FROM sensordata LIMIT 250')
+                cursor.execute('SELECT * FROM sensordata ORDER BY stamp DESC LIMIT 250')
                 data = cursor.fetchall()
 
                 # Adjust sleeptime according to size of data fetched from sqlite
@@ -646,8 +650,6 @@ class Agent(object):
 
     def __init__(self, config_filename, agent_id, server_address,
                  webapi_address, sqlite_path, certs_dir, time_diff=600):
-        # No handlers found for logger "sth" quickfix:
-        logging.basicConfig(level=logging.INFO)
         self._queue = multiprocessing.Queue()
         # Get logger initialized in client.
         self.log = logger(self.__class__.__name__)
@@ -843,7 +845,7 @@ class Agent(object):
         if self.intern_sensors['config_applied_id']:
             self.send_new_config(self.agentconfig)
         else:
-            self.log.error(
+            self.log.warning(
                 'Config invalid, does not provide config_id for _conf_applied sensor. '
                 'Could not notify server that configuration has been applied.'
             )
@@ -882,7 +884,7 @@ class Agent(object):
             loaded_config = yaml.safe_load(open(self.configfile).read())
         except IOError:
             loaded_config = yaml.safe_load('sensors: []')
-            self.log.error('Could not find config file. Creating new one.')
+            self.log.info('No config file, creating new one.')
 
         self.save_config(loaded_config)
 
@@ -956,6 +958,32 @@ class Agent(object):
             )
         )
 
+    @staticmethod
+    def check_crypto(crt, key):
+        """
+        Checks if the key matches the certificate.
+        """
+        agent_crt = crypto.load_certificate(crypto.FILETYPE_PEM, crt)
+        agent_key = crypto.load_privatekey(crypto.FILETYPE_PEM, key)
+
+        agent_pub = agent_crt.get_pubkey()
+
+        # This seems to work with public as well
+        pub_asn1 = crypto.dump_privatekey(crypto.FILETYPE_ASN1, agent_pub)
+        priv_asn1 = crypto.dump_privatekey(crypto.FILETYPE_ASN1, agent_key)
+
+        # Decode DER
+        pub_der = asn1.DerSequence()
+        pub_der.decode(pub_asn1)
+        priv_der = asn1.DerSequence()
+        priv_der.decode(priv_asn1)
+
+        # Get the modulus
+        pub_modulus = pub_der[1]
+        priv_modulus = priv_der[1]
+
+        return pub_modulus == priv_modulus
+
     def fetch_certificate(self):
         '''
         fetch (potentially) signed certificate from webserver
@@ -976,10 +1004,22 @@ class Agent(object):
             )
             reqman.close()
         except ComputationError as ex:
-            self.log.error(ex)
+            if re.search('t been signed yet', str(ex), re.I):
+                self.log.info('Certificate has not been signed yet, please accept in admin panel.')
+            elif re.search('has been revoked', str(ex), re.I):
+                self.log.warning('Certificate for this agent has been revoked. '
+                                 'Please accept new one in admin panel.')
+            else:
+                self.log.error(ex)
             return False
 
-        with open(self.crt_path, 'w') as crt_fh:
+        with open(self.key_path, 'r') as key_fh:
+            if not self.check_crypto(cert, key_fh.read()):
+                self.log.warning('A valid certificate exists and it doesn\'t match the private key.'
+                                 ' Please revoke/reject all old certificates.')
+                return False
+
+        with open(self.crt_path, 'w', 0o400) as crt_fh:
             crt_fh.write(cert)
 
         self.log.info(
@@ -1036,6 +1076,9 @@ class Agent(object):
             self.log.addHandler(
                 AgentErrorLogHandler(self._queue, self.intern_sensors['error_id'])
             )
+        else:
+            self.log.warning("No sensorid found for error stream, will not send errors to server!")
+
         # Check if server's and agent's clocks are more or less synchronized.
         if not self._is_time_synchronized(10):
             self.log.error(
@@ -1156,10 +1199,8 @@ class Agent(object):
         Create wrapper for `requests` library with predefined parameters.
         '''
         certs_exist = os.path.exists(self.crt_path) and os.path.exists(self.key_path)
-        if certs_exist:
-            self.log.debug("agent has certificate")
-        else:
-            self.log.debug("agent doesn't have certificate")
+        if not certs_exist:
+            self.log.debug("Agent doesn't have certificate.")
         return partial(
             make_request,
             self.ca_path,

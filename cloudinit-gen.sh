@@ -52,7 +52,7 @@ cat > "$AGENT" <<EOF
 
 DESC="MonitOwl agent service"
 DAEMON="/opt/monitowl/run_agent"
-DAEMON_ARGS="-c /opt/monitowl/agentconfig.yaml -r --webapi-url $WEBAPI_URL"
+DAEMON_ARGS="-c /opt/monitowl/agentconfig.yaml -r --webapi-url $WEBAPI_URL --logs-max_size 10000000"
 PIDFILE=/var/run/monitowl-agent.pid
 
 # Functions

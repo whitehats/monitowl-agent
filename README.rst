@@ -33,7 +33,7 @@ Using setuptools
 
     $ git clone https://github.com/whitehats/monitowl-agent.git
     $ python setup.py install
-    $ monitowl-agent -r --webapi-url $SERVER_URL
+    $ monitowl-agent -r --webapi-url $SERVER_URL --logs-max_size 10000000
 
 Running manually
 ^^^^^^^^^^^^^^^^
@@ -42,7 +42,7 @@ Running manually
 
     $ git clone https://github.com/whitehats/monitowl-agent.git
     $ pip install -r requirements.txt
-    $ ./run_agent -r --webapi-url $SERVER_URL
+    $ ./run_agent -r --webapi-url $SERVER_URL --logs-max_size 10000000
 
 **Note**: Either way, we strongly recommend using python *virtualenv* to run dependency packages.
 

@@ -1,0 +1,42 @@
+#!/bin/sh
+### BEGIN INIT INFO
+# Provides:          monitowl-agent
+# Required-Start:    $remote_fs $syslog
+# Required-Stop:     $remote_fs $syslog
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: MonitOwl.com  Agent
+### END INIT INFO
+
+# Author: MonitOwl Team <biuro@whitehats.pl>
+#
+DESC="MonitOwl agent service"
+DAEMON="/opt/monitowl/src/bin/run_agent"
+DAEMON_ARGS="-c /opt/monitowl/agentconfig.yaml -r --webapi-url server:7700 --logs-max_size 10000000"
+PIDFILE=/var/run/monitowl-agent.pid
+
+# Functions
+do_start()
+{
+    . /opt/monitowl/virtualenv/bin/activate
+    start-stop-daemon -v -d /opt/monitowl/ --start --oknodo --background --make-pidfile --no-close --pidfile $PIDFILE --exec $DAEMON -- $DAEMON_ARGS  >> /opt/monitowl/agent.log 2>&1
+    RETVAL=$?
+}
+do_stop()
+{
+    . /opt/monitowl/virtualenv/bin/activate
+    start-stop-daemon --stop --oknodo --pidfile $PIDFILE --retry 5
+    RETVAL=$?
+}
+
+
+
+case "$1" in
+  start)
+        do_start
+        ;;
+  stop)
+        do_stop
+        ;;
+esac
+exit 0

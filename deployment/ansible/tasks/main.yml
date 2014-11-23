@@ -1,0 +1,42 @@
+---
+
+# Author: MonitOwl Team
+#
+# Objective: Deploy monitowl-agent
+
+
+- name: Create main dir
+  file: path=/opt/monitowl/ state=directory owner=root group=root
+
+- name: Checkout agent application
+  git: repo=https://github.com/whitehats/monitowl-agent.git dest=/opt/monitowl
+
+- name: Update apt cache
+  apt: update_cache=yes cache_valid_time=3600
+  when: ansible_os_family == "Debian"
+
+- name: Install system reqs
+  action: apt pkg={{item}}
+  with_items:
+      - cython
+      - python-virtualenv
+      - python-pip
+      - libyaml-dev
+      - libffi-dev
+      - libssl-dev
+      - python-dev
+      - git
+  when: ansible_os_family == "Debian"
+
+- name: Install python reqs
+  pip: requirements=/opt/monitowl/requirements.txt virtualenv=/opt/monitowl/virtualenv/
+
+- name: Copy monitowl-agent service file
+  template: src=etc/init.d/monitowl-agent dest=/etc/init.d/ mode=0755
+
+- name: Copy certificate
+  copy: src=ca.crt dest=/opt/monitowl/ mode=600
+
+- name: Run service
+  service: name=monitowl-agent state=started
+

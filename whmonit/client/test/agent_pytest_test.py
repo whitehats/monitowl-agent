@@ -11,6 +11,7 @@ import pytest
 import requests
 from mock import MagicMock, patch
 from interruptingcow import timeout
+from OpenSSL.crypto import Error as SSLError
 
 from whmonit.common.types import SensorConfig
 from whmonit.common.webclient import RequestManager
@@ -96,13 +97,13 @@ class TestAgent(object):
         RequestManager.request.return_value = 'new crt'
         RequestManager.close = MagicMock()
 
-        self.agent.fetch_certificate()
+        with pytest.raises(SSLError):
+            self.agent.fetch_certificate()
         RequestManager.request.assert_called_once_with(
             'certificates',
             'fetch',
             {'agent_id': 'dzik1'}
         )
-        assert open(self.crt_file.name).read() == 'new crt'
 
     @pytest.mark.parametrize('offset', [720000, -720000, 86405000])
     def test_agent_server_time_diff(self, offset):

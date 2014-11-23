@@ -6,58 +6,48 @@ import argparse
 import logging
 import hashlib
 import yaml
-from furl import furl
-from OpenSSL import crypto
 from socket import gethostname
 from uuid import getnode as mac_addr
+from furl import furl
+from OpenSSL import crypto
 
 from whmonit.client.agent import Agent
-from whmonit.common.log_handlers import LogFileHandler
+from whmonit.common.log import LogFileHandler, getLogger
 
 
 CERT_FILE = "agent.crt"
 CSR_FILE = "agent.csr"
 KEY_FILE = "agent.key"
 
-# TODO: agent should be rewritten using supervisor or other method to control
-# processes
+LOG = getLogger('client')
 
 
 def init_crypto():
     '''
     Generate private key and CSR for secure communication
     '''
-    log = logging.getLogger('monitowl.client')
-    if not (os.path.exists(CERT_FILE) or os.path.exists(CSR_FILE) or os.path.exists(KEY_FILE)):
-        key = crypto.PKey()
-        key.generate_key(crypto.TYPE_RSA, 2048)
+    key = crypto.PKey()
+    key.generate_key(crypto.TYPE_RSA, 2048)
 
-        req = crypto.X509Req()
-        subj = req.get_subject()
-        subj.C = "PL"
-        subj.ST = "Dolnyslask"
-        subj.L = "Wroclaw"
-        subj.O = "MonitOwl Agents"
-        subj.OU = "Agents"
-        subj.CN = gethostname()
+    req = crypto.X509Req()
+    subj = req.get_subject()
+    subj.C = "PL"
+    subj.ST = "Dolnyslask"
+    subj.L = "Wroclaw"
+    subj.O = "MonitOwl Agents"
+    subj.OU = "Agents"
+    subj.CN = gethostname()
 
-        req.set_pubkey(key)
-        req.sign(key, 'sha1')
+    req.set_pubkey(key)
+    req.sign(key, 'sha1')
 
-        with open(CSR_FILE, "wt") as fileh:
-            fileh.write(crypto.dump_certificate_request(crypto.FILETYPE_PEM, req))
-        with open(KEY_FILE, "wt") as fileh:
-            fileh.write(crypto.dump_privatekey(crypto.FILETYPE_PEM, key))
-        log.debug("Key and CSR created")
-        #TODO: take care of file permissions
-        #TODO: transfer the CSR to the collector
-
-    else:
-        log.error("One or more crypto files already exist!")
+    with open(CSR_FILE, "wt", 0o400) as fileh:
+        fileh.write(crypto.dump_certificate_request(crypto.FILETYPE_PEM, req))
+    with open(KEY_FILE, "wt", 0o400) as fileh:
+        fileh.write(crypto.dump_privatekey(crypto.FILETYPE_PEM, key))
+    LOG.info("Crypto files Key and CSR created")
 
 
-# Too many statements
-# pylint: disable=R0915
 def main(args):
     '''
     this will be lanched when user run this from cmd line
@@ -125,11 +115,10 @@ def main(args):
     debug_group.add_argument(
         '-l', '--level',
         action='store',
-        choices=['debug', 'info', 'warning', 'error', 'none', 'quiet'],
+        choices=['debug', 'info', 'warning', 'error', 'critical'],
         dest='level',
         default='error',
         help="change logging level (default: error). "
-        "Choices: quiet, error, warning, info, verbose, debug"
     )
     debug_group.add_argument(
         '-v', '--verbose',
@@ -144,13 +133,6 @@ def main(args):
         dest='level',
         const='debug',
         help="shortcut for -l debug",
-    )
-    debug_group.add_argument(
-        '-q', '--quiet',
-        action='store_const',
-        dest='level',
-        const='quiet',
-        help="shortcut for -l quiet",
     )
     debug_group.add_argument(
         '--logs',
@@ -216,10 +198,7 @@ def main(args):
             'Please specify --test-sensors or --webapi-url.'
         )
 
-    # TODO: configure logging acording to args
-    log = logging.getLogger('monitowl.client')
-    log.setLevel(logging.DEBUG)
-    formatter = logging.Formatter('%(asctime)s %(name)s(%(process)d) %(levelname)s %(message)s')
+    LOG.setLevel(getattr(logging, values.level.upper()))
     if values.logs:
         kwargs = {
             key: val for key, val in [
@@ -230,11 +209,9 @@ def main(args):
             if val
         }
         chlr = LogFileHandler(**kwargs)
-    else:
-        chlr = logging.StreamHandler()
-    chlr.setLevel(logging.DEBUG)
-    chlr.setFormatter(formatter)
-    log.addHandler(chlr)
+        chlr.setLevel(getattr(logging, values.level.upper()))
+        LOG.addHandler(chlr)
+        LOG.propagate = False
 
     if values.action == 'initialize':
         init_crypto()
@@ -250,13 +227,15 @@ def main(args):
                   values.sqlite_path,
                   values.certs_dir)
 
-    if (not os.path.exists(CERT_FILE) or not os.path.exists(KEY_FILE)) and not do_test:
-        init_crypto()
-    # TODO #1153: action for single attempt to fetch CRT
-    if not os.path.exists(CERT_FILE) and not do_test:
-        agent.request_certificate()
-        while not agent.fetch_certificate():
-            time.sleep(10)
+    if not do_test:
+        if not os.path.exists(CERT_FILE) or not os.path.exists(KEY_FILE):
+            init_crypto()
+
+        # TODO #1153: action for single attempt to fetch CRT
+        if not os.path.exists(CERT_FILE):
+            agent.request_certificate()
+            while not agent.fetch_certificate():
+                time.sleep(10)
 
     if values.action == 'run':
         agent.run()

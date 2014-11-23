@@ -1,0 +1,12 @@
+galaxy_info:
+    author: MonitOwl Team
+    description: "Deploy monitowl-agent on unix computer"
+    min_ansible_version: 1.6
+    platforms:
+        - name: Ubuntu
+        - name: Debian
+    categories:
+    - system
+    - networking
+    - monitoring
+
