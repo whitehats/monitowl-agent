@@ -108,7 +108,7 @@ def main(args):
         nargs=2,
         metavar=('SENSOR_NAME', 'CONFIG_DICT'),
         help='''test sensors without connecting to webapi,
-            example usage: btscan "{'frequency':6}" ''',
+            example usage: btscan "{'sampling_period':6}" ''',
     )
 
     debug_group = parser.add_argument_group('Logging')

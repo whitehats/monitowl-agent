@@ -91,8 +91,10 @@ class DefaultFormatter(logging.Formatter):
         '''
         Formats incoming message according to look described in main doc.
         '''
-        # Make a copy of msg in case somebody wants to format multiple times.
-        msg = str(record.msg)
+        try:
+            msg = record.getMessage()
+        except TypeError:
+            msg = str(record.msg)
 
         record.asctime = self.formatTime(record, self.datefmt)
         record.block = (self.colored and "{{{0}}} {{/{0}}}" or " ").format(

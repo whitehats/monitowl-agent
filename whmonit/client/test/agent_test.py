@@ -78,13 +78,14 @@ class SensorTest(TestCase):
         self.sensorproc = Sensor(
             self.queue,
             "uptime",
-            {"frequency": 1, 'run_timeout': 5},
+            {"sampling_period": 1, 'run_timeout': 5},
             "config_id",
             "target",
             "target_id",
             MagicMock(),
         )
 
+    @skip("#1638: Test is unpredictable")
     def test_runsensor(self):
         '''Run a sensorproc and check if it produces data.'''
         self.sensorproc.start()

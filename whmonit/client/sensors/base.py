@@ -337,11 +337,11 @@ class TaskSensorBase(SensorBase):
         '$schema': 'http://json-schema.org/schema#',
         'type': 'object',
         'properties': {
-            'frequency': {'type': 'integer'},
+            'sampling_period': {'type': 'integer'},
             'memory_limit': {'type': 'integer', 'minimum': 1024},
             'run_timeout': {'type': 'integer', 'minimum': 5, 'maximum': 3600}
         },
-        'required': ['frequency'],
+        'required': ['sampling_period'],
         'additionalProperties': False
     }
 

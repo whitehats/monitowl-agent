@@ -1,7 +1,7 @@
 `MonitOwl`_ Agent
 -----------------
 
-This is a part of `MonitOwl`_ - monitoring software. This repository contains only monitowl-agent - part that is responsible for:
+This is a part of `MonitOwl`_ - monitoring software. This repository contains monitowl-agent - part that is responsible for:
 
 1. Collecting the data from hardware (like S.M.A.R.T. from hard drives)
 2. Collecting the data from operating system (network traffic, iostats, processes or user activity, system logs)
@@ -12,19 +12,17 @@ This is a part of `MonitOwl`_ - monitoring software. This repository contains on
 Security
 ========
 
-All of the agent<->server communication is done with HTTPS.
-
-Agent needs a *ca.crt* file with CA that signed server certificate. This way agent ensures that server connection is not spoofed.
-
-During initalization agent generates *key* and *csr*, then asks server to sign it and downloads *crt* file. This way server can be sure that agent connection is not spoofed.
+All of the agent<->server communication is done with HTTPS. Agent needs a *ca.crt* file with CA that signed server certificate. This way agent ensures that server connection is not spoofed. During initalization agent generates *key* and *csr*, then asks server to sign it and downloads *crt* file. This way server can be sure that agent connection is not spoofed.
 
 Installation
 ============
 
 You will need two informations:
 
-1. MonitOwl instance frontend server URL (ex: *https://cusomer.monitowl.com*).
-2. MonitOwl instance CA certificate. Both of them will be provided to you by our sales team.
+1. MonitOwl instance frontend server URL (ex: *https://customer.monitowl.com*).
+2. MonitOwl instance CA certificate.
+
+Both of them will be provided to you by our sales team.
 
 Using setuptools
 ^^^^^^^^^^^^^^^^

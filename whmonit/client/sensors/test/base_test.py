@@ -50,7 +50,7 @@ class TestClassSensors(object):
                 for _ in xrange(self.config['data_count']):
                     self.send_results(datetime.utcnow(), (('default', 47.),))
 
-        self.sensor = TestTaskSensor({'frequency': 10}, self.send_data, {})
+        self.sensor = TestTaskSensor({'sampling_period': 10}, self.send_data, {})
         self.adv_sensor = TestAdvancedSensor({'data_count': 3}, self.send_data, {})
 
         self.datetime_patch = patch(
@@ -78,12 +78,12 @@ class TestClassSensors(object):
                 'type': 'object',
                 'properties': {
                     'host': {'type': 'string'},
-                    'frequency': {'type': 'integer'},
+                    'sampling_period': {'type': 'integer'},
                     'memory_limit': {'type': 'integer', 'minimum': 1024},
                     'run_timeout': {'type': 'integer', 'minimum': 5, 'maximum': 3600}
                 },
                 'dependencies': {},
-                'required': ['frequency'],
+                'required': ['sampling_period'],
                 'additionalProperties': False
             },
         ),
@@ -107,11 +107,11 @@ class TestClassSensors(object):
                     'host': {'type': 'string'},
                     'login': {'type': 'string'},
                     'password': {'type': 'string'},
-                    'frequency': {'type': 'integer'},
+                    'sampling_period': {'type': 'integer'},
                     'memory_limit': {'type': 'integer', 'minimum': 1024},
                     'run_timeout': {'type': 'integer', 'minimum': 5, 'maximum': 3600}
                 },
-                'required': ['host', 'frequency'],
+                'required': ['sampling_period', 'host'],
                 'dependencies': {'login': ['password'], 'password': ['login']},
                 'additionalProperties': False
             },
@@ -138,7 +138,7 @@ class TestClassSensors(object):
         Passing 'false' send_results should throw an existing exception.
         '''
         with pytest.raises(InvalidSendResultsError):
-            self.task_sensor_factory({'frequency': 10}, None, {})
+            self.task_sensor_factory({'sampling_period': 10}, None, {})
 
     def test_send_results(self):
         '''
@@ -200,4 +200,4 @@ class TestClassSensors(object):
                 "error",
                 "Error while merging schemas: config_schema in class "
                 "`TestTaskSensor` should be valid against `meta_schema` "
-                "`'frequency' is a required property`"),))
+                "`'sampling_period' is a required property`"),))

@@ -138,7 +138,7 @@ class TestAgent(object):
         Run with one sensor - uptime.
         '''
         self.agent.agentconfig = {'sensors': [{
-            'config': {'frequency': 60},
+            'config': {'sampling_period': 60},
             'sensor': 'uptime',
             'config_id': 'config_id',
             'target': 'target',
@@ -233,7 +233,7 @@ class TestSensor(object):
         self.sensor = Sensor(
             self.queue,
             'uptime',
-            SensorConfig({'frequency': 1}),
+            SensorConfig({'sampling_period': 1}),
             'config_id',
             'target',
             'target_id',

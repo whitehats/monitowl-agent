@@ -385,7 +385,7 @@ class Sensor(multiprocessing.Process):
 
                     # Calculate exact time when should be next run and sleep that
                     # time.
-                    sleeptime = self.config['frequency'] - (timer() - runtime)
+                    sleeptime = self.config['sampling_period'] - (timer() - runtime)
                     if sleeptime < 0:
                         self.log.warning('We are behind the schedule ({} secs)!'
                                          .format(sleeptime))
