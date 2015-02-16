@@ -18,6 +18,7 @@ from whmonit.common.log import LogFileHandler, getLogger
 CERT_FILE = "agent.crt"
 CSR_FILE = "agent.csr"
 KEY_FILE = "agent.key"
+CA_FILE = "ca.crt"
 
 LOG = getLogger('client')
 
@@ -228,7 +229,7 @@ def main(args):
                   values.certs_dir)
 
     if not do_test:
-        if not os.path.exists(CERT_FILE) or not os.path.exists(KEY_FILE):
+        if not os.path.exists(CSR_FILE) or not os.path.exists(KEY_FILE):
             init_crypto()
 
         # TODO #1153: action for single attempt to fetch CRT

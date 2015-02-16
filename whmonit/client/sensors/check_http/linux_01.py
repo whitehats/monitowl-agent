@@ -54,11 +54,6 @@ class Sensor(TaskSensorBase):
                 'default': 80
             },
             'path': {'type': 'string', 'default': ''},
-            'headers': {'type': 'object'},
-            'cookies': {'type': 'object'},
-            'verify': {'type': 'boolean'},
-            'auth': {'type': 'array'},
-            'cert': {'type': 'array'},
             'timeout': {
                 'type': 'number',
                 'minimum': 0,
@@ -80,11 +75,13 @@ class Sensor(TaskSensorBase):
             path=self.config['path'],
         )
         method = self.config['method']
+
+        # Optional arguments for requests.request. The `requests.request` API
+        # interprets `None` as "use default value".
         args = {
-            key: self.config[key] for key in
-            ['headers', 'cookies', 'verify', 'auth', 'cert', 'timeout']
-            if key in self.config
+            'timeout': self.config.get('timeout', None),
         }
+
         try:
             req = requests.request(method, url.url, **args)
             return (
