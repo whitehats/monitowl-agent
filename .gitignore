@@ -21,6 +21,7 @@ __pycache__/
 agent.csr
 agent.key
 agent.crt
+ca.crt
 
 tools/.certs/*.csr
 tools/.certs/*.crt

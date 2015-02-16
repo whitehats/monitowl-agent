@@ -5,7 +5,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="monitowl-agent",
-    version="10",
+    version="11",
     description="MonitOwl.com Agent software",
     long_description=open("README.rst").read(),
     license="Apache Software License",
