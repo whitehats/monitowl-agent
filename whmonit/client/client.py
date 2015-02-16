@@ -13,7 +13,7 @@ from OpenSSL import crypto
 
 from whmonit.client.agent import Agent
 from whmonit.common.log import LogFileHandler, getLogger
-
+from whmonit.client.certificates import MONITOWL_WEB_CRT
 
 CERT_FILE = "agent.crt"
 CSR_FILE = "agent.csr"
@@ -231,6 +231,11 @@ def main(args):
     if not do_test:
         if not os.path.exists(CSR_FILE) or not os.path.exists(KEY_FILE):
             init_crypto()
+
+        if not os.path.exists(CA_FILE):
+            LOG.info("Using default CA certificate.")
+            with open(CA_FILE, "wt", 0o400) as fileh:
+                fileh.write(MONITOWL_WEB_CRT)
 
         # TODO #1153: action for single attempt to fetch CRT
         if not os.path.exists(CERT_FILE):
