@@ -9,20 +9,30 @@ This is a part of `MonitOwl`_ - monitoring software. This repository contains mo
 4. Collecting the data from remote network devices
 5. Sending packed and encrypted data packages to MonitOwl server
 
-Security
-========
-
-All of the agent<->server communication is done with HTTPS. Agent needs a *ca.crt* file with CA that signed server certificate. This way agent ensures that server connection is not spoofed. During initalization agent generates *key* and *csr*, then asks server to sign it and downloads *crt* file. This way server can be sure that agent connection is not spoofed.
 
 Installation
 ============
 
-You will need two informations:
+Before you start ensure that you have MonitOwl instance frontend server address (ex: *https://customer.monitowl.com*).
 
-1. MonitOwl instance frontend server URL (ex: *https://customer.monitowl.com*).
-2. MonitOwl instance CA certificate.
 
-Both of them will be provided to you by our sales team.
+Using single executable (recommended)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Building the executable yourself
+################################
+
+::
+
+    $ git clone https://github.com/whitehats/monitowl-agent.git
+    $ cd monitowl-agent
+    $ pip install -r requirements.txt
+    $ pip install https://github.com/pyinstaller/pyinstaller/archive/67610f2ddadf378c90bf3c8872f3b38baefcb215.zip
+    $ pyinstaller bundle.spec
+
+The resulting file will be in ``dist/monitowl-agent``.
+
+**Note**: Pyinstaller==2.1 has a problem handling the cryptography package, so we are currently using a commit from the develop branch where it is fixed.
 
 Using setuptools
 ^^^^^^^^^^^^^^^^
@@ -43,6 +53,11 @@ Running manually
     $ ./run_agent -r --webapi-url $SERVER_URL --logs-max_size 10000000
 
 **Note**: Either way, we strongly recommend using python *virtualenv* to run dependency packages.
+
+Security
+========
+
+All of the agent<->server communication is done with HTTPS. Agent needs a *ca.crt* file with CA that signed server certificate. This way agent ensures that server connection is not spoofed. During initalization agent generates *key* and *csr*, then asks server to sign it and downloads *crt* file. This way server can be sure that agent connection is not spoofed.
 
 Automatic deployment
 ^^^^^^^^^^^^^^^^^^^^
