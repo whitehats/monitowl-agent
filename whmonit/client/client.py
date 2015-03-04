@@ -2,7 +2,7 @@
 import sys
 import os
 import time
-import argparse
+import configargparse
 import logging
 import hashlib
 import yaml
@@ -56,7 +56,11 @@ def main(args):
     # R0912: Too many branches
     # R0915: Too many statements
     # pylint: disable=R0912,R0915
-    parser = argparse.ArgumentParser()
+    parser = configargparse.ArgumentParser()
+    parser.add_argument(
+        '-c', '--config', is_config_file=True,
+        help='Path to configuration file.',
+    )
 
     action_group = parser.add_mutually_exclusive_group(required=True)
     action_group.add_argument(
@@ -158,10 +162,9 @@ def main(args):
     )
 
     parser.add_argument(
-        '-c', '--config-path',
-        dest='config_filename',
+        '-s', '--sensors-config',
         default=".agentconfig.yaml",
-        help="config file to use (try to use absolute paths to avoid surprises)",
+        help="Sensors config file.",
     )
 
     parser.add_argument(
@@ -221,7 +224,7 @@ def main(args):
     collector_address = furl().set(scheme='https', host=values.webapi_address, path='collector').url
     webapi_address = furl().set(scheme='wss', host=values.webapi_address).url
     # run action
-    agent = Agent(values.config_filename,
+    agent = Agent(values.sensors_config,
                   values.agent_id,
                   collector_address,
                   webapi_address,

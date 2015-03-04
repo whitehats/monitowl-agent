@@ -7,6 +7,7 @@ websocket-client==0.23.0
 enum34==1.0.4
 colorclass==1.1.2
 backports.shutil_get_terminal_size==1.0.0
+configargparse==0.9.3
 requests==2.5.1
 furl==0.4.4
 pyyaml

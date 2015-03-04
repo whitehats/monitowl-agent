@@ -32,8 +32,7 @@ class Sensor(TaskSensorBase):
     config_schema = {
         '$schema': 'http://json-schema.org/schema#',
         'type': 'object',
-        'properties': {'mountpoint': {'type': 'string'}},
-        'required': ['mountpoint'],
+        'properties': {'mountpoint': {'type': 'string', 'default': '/'}},
         'additionalProperties': False
     }
 

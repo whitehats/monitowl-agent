@@ -19,6 +19,21 @@ Before you start ensure that you have MonitOwl instance frontend server address 
 Using single executable (recommended)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+Single command
+
+::
+
+    $ curl https://github.com/whitehats/monitowl-agent/raw/master/install.sh | sudo sh -s URL
+
+where ``URL`` should be replaced with MonitOwl instance frontend server address (see above).
+
+This will:
+
+1. Download the latest monitowl-agent release (from `here`_).
+2. Update (or create) a configuration file pointing at ``URL``.
+3. Detect your init system and install appropriate init script/service.
+4. (Re)start the monitowl-agent system service.
+
 Building the executable yourself
 ################################
 
@@ -77,3 +92,4 @@ Support
 This software is released as-is. MonitOwl provides warranty and support on this software only for own customers, according to selected support package. If you have any issues with the software, please feel free to post an Issue on our Issues page.
 
 .. _MonitOwl: http://monitowl.com
+.. _here: https://github.com/whitehats/monitowl-agent/releases

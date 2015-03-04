@@ -1,0 +1,10 @@
+[Unit]
+Description=monitowl-agent
+After=remote-fs.target network.target
+
+[Service]
+ExecStart=/opt/monitowl/monitowl-agent -c /opt/monitowl/agentconfig.ini
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
