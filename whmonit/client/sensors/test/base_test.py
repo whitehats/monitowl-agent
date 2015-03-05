@@ -78,7 +78,7 @@ class TestClassSensors(object):
                 'type': 'object',
                 'properties': {
                     'host': {'type': 'string'},
-                    'sampling_period': {'type': 'integer', 'default': 10},
+                    'sampling_period': {'type': 'integer', 'default': 10, 'minimum': 1},
                     'memory_limit': {'type': 'integer', 'minimum': 1024},
                     'run_timeout': {'type': 'integer', 'minimum': 5, 'maximum': 3600}
                 },
@@ -107,7 +107,7 @@ class TestClassSensors(object):
                     'host': {'type': 'string'},
                     'login': {'type': 'string'},
                     'password': {'type': 'string'},
-                    'sampling_period': {'type': 'integer', 'default': 10},
+                    'sampling_period': {'type': 'integer', 'default': 10, 'minimum':1},
                     'memory_limit': {'type': 'integer', 'minimum': 1024},
                     'run_timeout': {'type': 'integer', 'minimum': 5, 'maximum': 3600}
                 },

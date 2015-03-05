@@ -23,7 +23,7 @@ Single command
 
 ::
 
-    $ curl https://github.com/whitehats/monitowl-agent/raw/master/install.sh | sudo sh -s URL
+    $ curl -L https://github.com/whitehats/monitowl-agent/raw/master/install.sh | sudo sh -s URL
 
 where ``URL`` should be replaced with MonitOwl instance frontend server address (see above).
 
