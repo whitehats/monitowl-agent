@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 from whmonit.client.sensors import TaskSensorBase
+from whmonit.common.units import unit_reg
 
 
 class Sensor(TaskSensorBase):
@@ -14,11 +15,13 @@ class Sensor(TaskSensorBase):
     streams = {
         'read_bytes': {
             'type': float,
-            'description': 'Number of bytes read.'
+            'description': 'Number of bytes read.',
+            'unit': str(unit_reg.byte)
         },
         'write_bytes': {
             'type': float,
-            'description': 'Number of bytes written.'
+            'description': 'Number of bytes written.',
+            'unit': str(unit_reg.byte)
         },
         'read_count': {
             'type': float,
@@ -30,11 +33,13 @@ class Sensor(TaskSensorBase):
         },
         'read_time': {
             'type': float,
-            'description': 'Time spent reading from disk (in milliseconds).'
+            'description': 'Time spent reading from disk (in milliseconds).',
+            'unit': str(unit_reg.millisec)
         },
         'write_time': {
             'type': float,
-            'description': 'Time spent writing to disk (in milliseconds).'
+            'description': 'Time spent writing to disk (in milliseconds).',
+            'unit': str(unit_reg.millisec)
         }
     }
     config_schema = {

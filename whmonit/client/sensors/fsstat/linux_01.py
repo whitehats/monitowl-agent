@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 from whmonit.client.sensors import TaskSensorBase
+from whmonit.common.units import unit_reg
 
 
 class Sensor(TaskSensorBase):
@@ -14,15 +15,18 @@ class Sensor(TaskSensorBase):
     streams = {
         'total': {
             'type': float,
-            'description': 'Total size of the disc.'
+            'description': 'Total size of the disc.',
+            'unit': str(unit_reg.byte)
         },
         'used': {
             'type': float,
-            'description': 'Used space of the disc.'
+            'description': 'Used space of the disc.',
+            'unit': str(unit_reg.byte)
         },
         'free': {
             'type': float,
-            'description': 'Free space of the disc.'
+            'description': 'Free space of the disc.',
+            'unit': str(unit_reg.byte)
         },
         'percent': {
             'type': float,

@@ -20,7 +20,7 @@ class Sensor(TaskSensorBase):
         },
         'cpu_percent': {
             'type': float,
-            'description': 'Percent of CPU usage.'
+            'description': 'Percent of CPU usage.',
         },
         'cpu_times': {
             'type': float,

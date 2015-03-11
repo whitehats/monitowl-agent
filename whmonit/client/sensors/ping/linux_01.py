@@ -7,6 +7,7 @@ network ping sensor.
 from ping import do_one as ping
 
 from whmonit.client.sensors import TaskSensorBase
+from whmonit.common.units import unit_reg
 
 
 class Sensor(TaskSensorBase):
@@ -22,7 +23,8 @@ class Sensor(TaskSensorBase):
             'type': float,
             'description':
                 'Time from sending message to destination host '
-                'to receiving acknowledgment.'
+                'to receiving acknowledgment.',
+            'unit': str(unit_reg.millisec)
         }
     }
     config_schema = {

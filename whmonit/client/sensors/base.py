@@ -12,6 +12,7 @@ from whmonit.common.enums import INTERNAL_SENSORS
 from whmonit.common.metaclasses import BaseCheckMeta, CheckException
 from whmonit.common.types import PRIMITIVE_TYPE_REGISTRY
 from whmonit.common.validators import ValidatorWithDefault
+from whmonit.common.units import unit_reg
 
 
 class InvalidDataError(Exception):
@@ -99,6 +100,7 @@ class SensorBaseMeta(BaseCheckMeta):
         and stream types are dicts with:
          'type': of type :ref:`primitive <primitives>`
          'description': of type :ref:`str`
+         'unit': of type :ref:`str`
         '''
         if inspect.isabstract(cls):
             return
@@ -136,6 +138,11 @@ class SensorBaseMeta(BaseCheckMeta):
                     "{}.streams['type_info']['description']: `{}` "
                     "should start with an uppercase and end with fullstop"
                     .format(clsname, desc)
+                )
+            if 'unit' in return_type and not isinstance(return_type['unit'], basestring):
+                yield CheckException(
+                    "{}.streams['type_info']['unit']: `{}` is not a string"
+                    .format(clsname, return_type['unit'])
                 )
 
 
@@ -184,6 +191,7 @@ class SensorBase(object):
                 Sensor can produce data associated with one of its
                 streams (the data must be of type defined by associated stream).
             'description' - description of the stream
+            'unit' - (optional) unit of returned values
 
         The idea behind stream types is to allow each stream (each :ref:`primitive
         <primitives>`) to be handled efficiently during transfer over a network and
@@ -205,7 +213,8 @@ class SensorBase(object):
                 },
                 'my_stream': {
                     'type': float,
-                    'description': 'my_stream description'
+                    'description': 'my_stream description',
+                    'unit': `celsius`,
                 }
             }
 

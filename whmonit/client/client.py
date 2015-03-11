@@ -221,8 +221,15 @@ def main(args):
         init_crypto()
         return
 
+    if furl(values.webapi_address).scheme:
+        LOG.error(
+            "Please provide webapi URL with no schema (without {}). "
+            "Example: `demo.monitowl.com`".format(furl(values.webapi_address).scheme)
+        )
+        return
     collector_address = furl().set(scheme='https', host=values.webapi_address, path='collector').url
     webapi_address = furl().set(scheme='wss', host=values.webapi_address).url
+
     # run action
     agent = Agent(values.sensors_config,
                   values.agent_id,

@@ -20,7 +20,7 @@ echo "Downloading monitowl-agent binary from \`${BINURL}/${BINNAME}\` to \`${BIN
 curl -L --progress-bar -o "${BINDIR}/monitowl-agent" "${BINURL}/${BINNAME}"
 chmod +x "${BINDIR}/monitowl-agent"
 
-if [ -n $1 ]; then
+if [ -n "$1" ]; then
     WEBAPIURL=$1
 fi
 
@@ -41,7 +41,7 @@ else
     fi
 fi
 
-if init --version &>/dev/null | grep -q "systemd"; then
+if init --version > /dev/null 2>&1 | grep -q "systemd"; then
     echo "Detected systemd, downloading service file from \`${SYSTEMDURL}\` to \`${SYSTEMDDIR}\`."
     curl -L --progress-bar -o "${SYSTEMDDIR}" "${SYSTEMDURL}"
     systemctl daemon-reload

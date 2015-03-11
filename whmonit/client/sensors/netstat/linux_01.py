@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 from whmonit.client.sensors import TaskSensorBase
+from whmonit.common.units import unit_reg
 
 
 class Sensor(TaskSensorBase):
@@ -14,19 +15,21 @@ class Sensor(TaskSensorBase):
     streams = {
         'bytes_sent': {
             'type': float,
-            'description': 'Number of bytes sent.'
+            'description': 'Number of bytes sent.',
+            'unit': str(unit_reg.byte)
         },
         'bytes_recv': {
             'type': float,
-            'description': 'Number of bytes received.'
+            'description': 'Number of bytes received.',
+            'unit': str(unit_reg.byte)
         },
         'dropin': {
             'type': float,
-            'description': 'Total number of incoming packets.'
+            'description': 'Total number of incoming packets which were dropped.'
         },
         'dropout': {
             'type': float,
-            'description': 'Total number of outgoing packets.'
+            'description': 'Total number of outgoing packets which were dropped.'
         },
         'packets_recv': {
             'type': float,
