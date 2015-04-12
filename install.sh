@@ -1,8 +1,8 @@
 #!/bin/sh
 
 BINDIR="/opt/monitowl"
-SYSTEMDDIR="/etc/systemd/system/monitowl-agent.service"
-SYSVDIR="/etc/init.d/monitowl-agent"
+SYSTEMDFILE="/etc/systemd/system/monitowl-agent.service"
+SYSVFILE="/etc/init.d/monitowl-agent"
 
 REPOURL="https://github.com/whitehats/monitowl-agent"
 BINURL="${REPOURL}/releases/download/latest"
@@ -42,14 +42,15 @@ else
 fi
 
 if init --version > /dev/null 2>&1 | grep -q "systemd"; then
-    echo "Detected systemd, downloading service file from \`${SYSTEMDURL}\` to \`${SYSTEMDDIR}\`."
-    curl -L --progress-bar -o "${SYSTEMDDIR}" "${SYSTEMDURL}"
+    echo "Detected systemd, downloading service file from \`${SYSTEMDURL}\` to \`${SYSTEMDFILE}\`."
+    curl -L --progress-bar -o "${SYSTEMDFILE}" "${SYSTEMDURL}"
     systemctl daemon-reload
     systemctl restart monitowl-agent
     systemctl enable monitowl-agent
 else
-    echo "Detected SysV/Upstart, downloading init script from \`${SYSVURL}\` to \`${SYSVDIR}\`."
-    curl -L --progress-bar -o "${SYSVDIR}" "${SYSVURL}"
+    echo "Detected SysV/Upstart, downloading init script from \`${SYSVURL}\` to \`${SYSVFILE}\`."
+    curl -L --progress-bar -o "${SYSVFILE}" "${SYSVURL}"
+    chmod +x "${SYSVFILE}"
     service monitowl-agent stop
     service monitowl-agent start
     update-rc.d -f monitowl-agent defaults

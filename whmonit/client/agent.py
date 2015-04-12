@@ -31,33 +31,28 @@ from Crypto.Util import asn1
 
 # Kenji: I'm taking dispense from our formatting guide, we need this here.
 from whmonit.common.log import AgentErrorLogHandler, getLogger
-try:
-    import jsonschema
-    import psutil
-    import requests
-    import gzip
-    import StringIO
-    import yaml
-    from furl import furl
-    from interruptingcow import timeout
 
-    # C0103: Invalid constant name
-    # pylint: disable=C0103
-    if sys.platform in ['linux2', 'darwin']:
-        from monotime import monotonic as timer
-        from setproctitle import setproctitle
-    else:
-        setproctitle = lambda x: x
-        from time import time as timer
-        getLogger('client.Agent').debug(
-            "Your platform {} doesn't support monotonic clock,"
-            " using normal clock. During time changes it may misbehave.".format(sys.platform)
-        )
+import jsonschema
+import psutil
+import requests
+import gzip
+import StringIO
+import yaml
+from furl import furl
+from interruptingcow import timeout
 
-except ImportError as ex:
-    print >> sys.stderr, '{}. Please install it or check documentation ' \
-                         'for more information.'.format(ex)
-    sys.exit(1)
+# C0103: Invalid constant name
+# pylint: disable=C0103
+if sys.platform in ['linux2', 'darwin']:
+    from monotime import monotonic as timer
+    from setproctitle import setproctitle
+else:
+    setproctitle = lambda x: x
+    from time import time as timer
+    getLogger('client.Agent').debug(
+        "Your platform {} doesn't support monotonic clock,"
+        " using normal clock. During time changes it may misbehave.".format(sys.platform)
+    )
 
 from whmonit.client.sensors.base import (
     TaskSensorBase, AdvancedSensorBase, InvalidDataError
@@ -1002,7 +997,6 @@ class Agent(object):
                 'fetch',
                 {'agent_id': self.agent_id}
             )
-            reqman.close()
         except ComputationError as ex:
             if re.search('t been signed yet', str(ex), re.I):
                 self.log.info('Certificate has not been signed yet, please accept in admin panel.')
@@ -1012,6 +1006,8 @@ class Agent(object):
             else:
                 self.log.error(ex)
             return False
+        finally:
+            reqman.close()
 
         with open(self.key_path, 'r') as key_fh:
             if not self.check_crypto(cert, key_fh.read()):
