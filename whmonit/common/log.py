@@ -112,7 +112,9 @@ class DefaultFormatter(logging.Formatter):
         self.wrapper.subsequent_indent = self._indent
 
         if record.exc_info:
-            msg = ''.join(traceback.format_exception(*record.exc_info))
+            msg = '{}\n{}'.format(
+                msg, ''.join(traceback.format_exception(*record.exc_info))
+            )
             self.join_str = "\n"
 
         if record.levelno in [SEND, RECV]:

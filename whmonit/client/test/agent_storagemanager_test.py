@@ -5,7 +5,7 @@ Tests for Agent's StorageManager.
 # TODO: Tests with real DB?
 
 import multiprocessing
-from mock import MagicMock, patch
+from mock import MagicMock
 
 from ..agent import StorageManager
 
@@ -36,17 +36,13 @@ class TestStorageManager(object):
         self.sqliteconn = MagicMock()
         self.cursor = MagicMock()
         self.sqliteconn.cursor.return_value = self.cursor
-        self.patcher = patch('whmonit.client.agent.make_sqlite_conn')
-        mock_get_conn = self.patcher.start()
-        mock_get_conn.return_value = self.sqliteconn
-        self.manager = StorageManager('')
+        self.manager = StorageManager(lambda: self.sqliteconn)
 
     def teardown(self):
         '''
         Shuts down SyncManager.
         '''
         self.manager.manager.shutdown()
-        self.patcher.stop()
 
     def test_get_storage_new(self):
         '''

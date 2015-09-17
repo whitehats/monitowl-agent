@@ -24,7 +24,6 @@ import time
 import threading
 from abc import ABCMeta, abstractmethod
 from functools import partial
-from itertools import izip
 from multiprocessing.managers import SyncManager
 from OpenSSL import crypto
 from Crypto.Util import asn1
@@ -143,16 +142,49 @@ def logger(name):
     return getLogger('client.{}'.format(name))
 
 
-def make_sqlite_conn(dbpath):
+def get_sqlite_factory(dbpath):
     '''
-    Return connection to sqlite db with given path.
+    Returns factory for creating SQLite connections on given path.
     '''
-    sqliteconn = sqlite3.connect(
-        dbpath,
-        timeout=60,
-        check_same_thread=False
+    def make_sqlite_conn():
+        '''
+        Creates new SQLite connection.
+        '''
+        sqliteconn = sqlite3.connect(
+            dbpath,
+            timeout=60,
+            check_same_thread=False
+        )
+        return sqliteconn
+    return make_sqlite_conn
+
+
+def prepare_sqlite(sqlite_factory):
+    '''
+    Creates sql database.
+    '''
+    connection = sqlite_factory()
+    cursor = connection.cursor()
+
+    cursor.execute('PRAGMA auto_vacuum = FULL')
+    cursor.execute(
+        'CREATE TABLE IF NOT EXISTS sensordata (stamp TEXT, config_id '
+        'TEXT, stream TEXT, result TEXT)'
     )
-    return sqliteconn
+    cursor.execute(
+        'CREATE TABLE IF NOT EXISTS sensorstorage (key TEXT, value TEXT)'
+    )
+    cursor.execute(
+        'CREATE INDEX IF NOT EXISTS index_stamp on sensordata (stamp)'
+    )
+    cursor.execute(
+        'CREATE UNIQUE INDEX IF NOT EXISTS storage_key on sensorstorage (key)'
+    )
+
+    # check integrity of existing database
+    cursor.execute('PRAGMA integrity_check')
+
+    connection.commit()
 
 
 class AgentInternal(multiprocessing.Process):
@@ -218,7 +250,7 @@ class StorageManager(object):
     Values are stored in sqlite as stringified JSON documents.
     '''
     # TODO #1505: check if storage manager is pickable
-    def __init__(self, dbpath):
+    def __init__(self, sqlite_factory):
         '''
         Initializes sync manager and logger.
         '''
@@ -229,7 +261,7 @@ class StorageManager(object):
 
         self.ppid = None
 
-        self.sqliteconn = make_sqlite_conn(dbpath)
+        self.sqliteconn = sqlite_factory()
 
     def get_storage(self, name):
         '''
@@ -477,13 +509,13 @@ class Receiver(AgentInternal):
         from multiprocessing.Queue and storing it in sqlite buffer.
     '''
 
-    def __init__(self, queue, dbpath):
+    def __init__(self, queue, sqlite_factory):
         '''
         Initialize variables, setup queue and sqlite.
         '''
         super(Receiver, self).__init__(name='monitowl.receiver')
         self.queue = queue
-        self.dbpath = dbpath
+        self.sqlite_factory = sqlite_factory
 
     def run(self):
         '''
@@ -491,7 +523,7 @@ class Receiver(AgentInternal):
         in local buffer (sqlite).
         '''
         super(Receiver, self).run()
-        with make_sqlite_conn(self.dbpath) as conn:
+        with self.sqlite_factory() as conn:
             while self.running.is_set():
                 # Get data from sensors queue and store it in sqlite:
                 # Wait 1 sec, then read from queue until it's empty.
@@ -528,26 +560,22 @@ class Shipper(AgentInternal):
     # R0902: Too many instance attributes
     # pylint: disable=R0902
 
-    def __init__(self, send_results, dbpath):
+    def __init__(self, send_results, sqlite_factory):
         '''
         Initialize variables, setup queue and sqlite connection.
         '''
         super(Shipper, self).__init__(name='monitowl.shipper')
-        self.dbpath = dbpath
+        self.sqlite_factory = sqlite_factory
         self.send_results = send_results
         self.sleeptime = 1.0
-        # collector connection fail counters
-        self._confails = 1
 
     def run(self):
         super(Shipper, self).run()
-        with make_sqlite_conn(self.dbpath) as conn:
+        with self.sqlite_factory() as conn:
             while self.running.is_set():
                 # Get data from sqlite and send it to collector.
                 time.sleep(self.sleeptime)
                 cursor = conn.cursor()
-                # LIMIT is set due to possible DELETE problem
-                # OperationalError: too many SQL variables
                 cursor.execute('SELECT * FROM sensordata ORDER BY stamp DESC LIMIT 250')
                 data = cursor.fetchall()
 
@@ -570,7 +598,7 @@ class Shipper(AgentInternal):
                         self.serializer.unpack(result)
                     )
                     req_list.append(req)
-                    data_to_remove.append((config_id, timestamp))
+                    data_to_remove.append((timestamp, config_id))
 
                 if req_list:
                     try:
@@ -592,46 +620,36 @@ class Shipper(AgentInternal):
         '''
         Requests hook function - run after request finish.
         '''
-        if response.status_code == 0:
-            # Could not connect to collector.
-            self._confails = self._confails + 1
-            if self._confails > 200:
-                self._confails = 200
-            self.log.debug('Connection failed, _confails: {}'.format(self._confails))
-            return
-        elif response.status_code == 200:
-            self.log.debug('Data sent {} chars'.format(len(response.request.body)))
-        else:
-            self.log.error('Error while sending: {}'.format(response.text))
-
-        self._confails = 1
-        if response.status_code in (200, 400):
-            # status_code 400 - data was sent but collector ignored it
-            # TODO #1145: Do not use `response status code` alone for
-            #             communicating status of received data
-
-            try:
-                data_saved = json.loads(response.text)
-            except ValueError:
-                self.log.error('Received data are invalid.')
-                return
-            if data_saved['status'] == 'Not_all_saved':
-                data_to_remove = data_saved['data']
-
-            cursor = conn.cursor()
-            # This way of deleting rows might cause
-            # OperationalError: too many SQL variables
-            data_placeholders = ('?,' * len(data_to_remove))[:-1]
-            cursor.execute(
-                'DELETE FROM sensordata WHERE config_id IN ({}) AND stamp IN ({})'.format(
-                    data_placeholders, data_placeholders
-                ), sum(izip(*data_to_remove), ())
+        if response.status_code not in (200, 400):
+            self.log.error(
+                'Error while sending data, status: `%d`, message: `%s`',
+                response.status_code, response.text,
             )
-            conn.commit()
+            return
+
+        data_len = len(response.request.body)
+        if response.status_code == 200:
+            self.log.debug('Data (`%d` chars) sent successfully.', data_len)
         else:
-            self.log.exception('POST problem, response status: {}'.format(
-                response.status_code
-            ))
+            self.log.debug(
+                'Data (`%d` chars) sent, but ignored by collector.', data_len,
+            )
+        try:
+            data = json.loads(response.text)
+        except ValueError:
+            self.log.error('Received data are invalid.')
+            return
+        if data['status'] == 'ERROR_PARTIAL_STORE':
+            # Used builtin function
+            # pylint: disable=W0141
+            data_to_remove = set(data_to_remove) - set(map(tuple, data['reason']))
+
+        cursor = conn.cursor()
+        cursor.executemany(
+            'DELETE FROM sensordata WHERE stamp=? AND config_id=?',
+            data_to_remove,
+        )
+        conn.commit()
 
 
 class Agent(object):
@@ -670,6 +688,7 @@ class Agent(object):
         self.time_diff = datetime.timedelta(seconds=time_diff)
         self.log.debug('Agent: {}, Server address: {}'
                        .format(self.agent_id, self.serveraddr))
+        self.log.debug('Using sensordata DB `%s`', sqlite_path)
 
         self.serializer = JSONTypeRegistrySerializer(TYPE_REGISTRY)
 
@@ -677,43 +696,12 @@ class Agent(object):
         self.load_config()
         self._subprocesses = []
 
-        self._prepare_sqlite(sqlite_path)
-        self.sqlite_path = sqlite_path
+        self.sqlite_factory = get_sqlite_factory(sqlite_path)
+        prepare_sqlite(self.sqlite_factory)
 
-        self.storage_manager = StorageManager(self.sqlite_path)
+        self.storage_manager = StorageManager(self.sqlite_factory)
 
         self.running = True
-
-    def _prepare_sqlite(self, dbpath):
-        '''
-        Creates sql database.
-        '''
-        connection = make_sqlite_conn(dbpath)
-        cursor = connection.cursor()
-
-        self.log.debug('Connecting to sensordata db at {}'.format(dbpath))
-
-        cursor.execute('PRAGMA auto_vacuum = FULL')
-        cursor.execute(
-            'CREATE TABLE IF NOT EXISTS sensordata (stamp TEXT, config_id '
-            'TEXT, stream TEXT, result TEXT)'
-        )
-        cursor.execute(
-            'CREATE TABLE IF NOT EXISTS sensorstorage (key TEXT, value TEXT)'
-        )
-        cursor.execute(
-            'CREATE INDEX IF NOT EXISTS index_id on sensordata (config_id);'
-        )
-        cursor.execute(
-            'CREATE UNIQUE INDEX IF NOT EXISTS '
-            'storage_key on sensorstorage (key)'
-        )
-
-        # check integrity of existing database
-        cursor.execute('PRAGMA integrity_check')
-
-        connection.commit()
-        return connection
 
     def check_connection(self):
         '''
@@ -906,7 +894,10 @@ class Agent(object):
                 self.save_config(loaded_config)
                 return
             except requests.RequestException:
-                self.log.info('Connection problem while asking for conf')
+                self.log.info(
+                    'Connection problem while asking for config.',
+                    exc_info=True,
+                )
             except AssertionError as ex:
                 self.log.info(str(ex))
                 raise
@@ -1092,8 +1083,8 @@ class Agent(object):
             remote.url
         )
         # Spawn processes for data transfer.
-        self._start_subprocess(Receiver, (self._queue, self.sqlite_path))
-        self._start_subprocess(Shipper, (send_results, self.sqlite_path))
+        self._start_subprocess(Receiver, (self._queue, self.sqlite_factory))
+        self._start_subprocess(Shipper, (send_results, self.sqlite_factory))
 
         # Periodically check child processes and restart them if needed.
         recheck_config_timeout = 1

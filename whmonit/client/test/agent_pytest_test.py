@@ -5,6 +5,7 @@ Agent pytest tests.
 '''
 import json
 import os
+import sqlite3
 from datetime import datetime
 from multiprocessing.queues import Empty
 import pytest
@@ -15,7 +16,7 @@ from OpenSSL.crypto import Error as SSLError
 
 from whmonit.common.types import SensorConfig
 from whmonit.common.webclient import RequestManager
-from whmonit.client.agent import Agent, Shipper, AgentInternal, Receiver, Sensor
+from whmonit.client.agent import Agent, Shipper, Receiver, Sensor, prepare_sqlite
 from whmonit.client.sensors.uptime.linux_01 import Sensor as UptimeSensor
 from whmonit.common.test.helpers import UnbufferedNamedTemporaryFile
 from whmonit.common.time import datetime_to_milliseconds
@@ -154,6 +155,7 @@ class TestAgent(object):
         assert self.agent._start_subprocess.call_count == 3
 
 
+@patch('whmonit.client.agent.AgentInternal.run', MagicMock())
 class TestShipper(object):
     '''
     Shipper tests.
@@ -164,27 +166,110 @@ class TestShipper(object):
         Setup test.
         '''
         self.send_results = MagicMock()
-        self.sqliteconn = MagicMock()
-        AgentInternal.assert_parent_exists = MagicMock()
-        AgentInternal.run = MagicMock()
-        self.shipper = Shipper(self.send_results, '')
+        self.sqlite = sqlite3.connect(':memory:')
 
-    @patch('whmonit.client.agent.make_sqlite_conn')
-    def test_run_no_data(self, mock_get_conn):
+        prepare_sqlite(lambda: self.sqlite)
+        self.shipper = Shipper(self.send_results, lambda: self.sqlite)
+        self.shipper.assert_parent_exists = MagicMock()
+
+    def test_run_no_data(self):
         '''
         Run without upcoming data.
         '''
-        mock_get_conn.return_value.__enter__.return_value = self.sqliteconn
         try:
             with timeout(1.5):
                 self.shipper.run()
         except RuntimeError:
             pass
 
-        assert self.sqliteconn.cursor.called
         assert self.shipper.assert_parent_exists.called
 
+    @staticmethod
+    def make_response(status_code, data):
+        '''
+        Prepares requests.Response instance with given status_code, data
+        and mocked request part.
+        '''
+        response = requests.Response()
+        response.status_code = status_code
+        response._content = data
+        response.request = MagicMock()
+        return response
 
+    def store_chunks(self, chunks):
+        '''
+        For every chunk, stores a list of (chunk[0], chunk[1], 'default', 3.14)
+        elements in the database.
+        '''
+        self.sqlite.executemany(
+            'INSERT INTO sensordata(stamp, config_id, stream, result) '
+            'VALUES(?, ?, "default", 3.14)',
+            chunks,
+        )
+
+    def assert_sensordata(self, expected):
+        '''
+        Asserts that the sensordata table contains expected items.
+        '''
+        data = sorted(self.sqlite.execute('SELECT * FROM sensordata').fetchall())
+        assert data == sorted(expected)
+
+    @pytest.mark.parametrize(('data', 'stored', 'erroneous', 'expected'), (
+        (
+            ((1, '1' * 40), (2, '2' * 40)),
+            ((1, '1' * 40), (2, '2' * 40)),
+            (),
+            (),
+        ),
+        (
+            ((1, '1' * 40), (2, '2' * 40), (3, '3' * 40)),
+            ((1, '1' * 40), (3, '3' * 40)),
+            (),
+            (('2', '2' * 40),),
+        ),
+        (
+            ((1, '1' * 40), (2, '2' * 40)),
+            ((1, '1' * 40),),
+            ((1, '1' * 40),),
+            (('1', '1' * 40), ('2', '2' * 40)),
+        ),
+        (
+            ((1, '1' * 40), (2, '2' * 40), (2, '1' * 40)),
+            ((1, '1' * 40), (2, '2' * 40)),
+            ((2, '1' * 40),),
+            (('2', '1' * 40),),
+        ),
+    ))
+    def test__reqdone(self, data, stored, erroneous, expected):
+        '''
+        Should remove sent data from database, excluding erroneous entries.
+        '''
+        response = self.make_response(200, json.dumps({
+            "status": "ERROR_PARTIAL_STORE" if erroneous else "OK",
+            "reason": erroneous,
+        }))
+        self.store_chunks(data)
+
+        self.shipper._reqdone(stored + erroneous, self.sqlite, response)
+
+        self.assert_sensordata([item + ('default', '3.14') for item in expected])
+
+    @pytest.mark.parametrize(('status_code', 'data'), ((200, 'I'), (500, '{}')))
+    def test__reqdone_response_error(self, status_code, data):
+        '''
+        Should not do anything.
+        Especially not remove anything from database.
+        '''
+        response = self.make_response(status_code, data)
+        sqlite = MagicMock()
+        sqlite.cursor.return_value = MagicMock()
+
+        self.shipper._reqdone((('1' * 40, 1)), sqlite, response)
+
+        assert not sqlite.cursor().executemany.called
+
+
+@patch('whmonit.client.agent.AgentInternal.run', MagicMock())
 class TestReceiver(object):
     '''
     Receiver tests.
@@ -195,27 +280,24 @@ class TestReceiver(object):
         Setup test.
         '''
         self.send_results = MagicMock()
-        self.sqliteconn = MagicMock()
-        AgentInternal.assert_parent_exists = MagicMock()
-        AgentInternal.run = MagicMock()
-        self.receiver = Receiver(self.send_results, '')
+        self.sqlite = sqlite3.connect(':memory:')
+
+        self.receiver = Receiver(self.send_results, lambda: self.sqlite)
+        self.receiver.assert_parent_exists = MagicMock()
         self.receiver.queue = MagicMock()
         self.receiver.queue.get_nowait.side_effect = Empty
         self.receiver.serializer = MagicMock()
 
-    @patch('whmonit.client.agent.make_sqlite_conn')
-    def test_run_no_data(self, mock_get_conn):
+    def test_run_no_data(self):
         '''
         Run without upcoming data.
         '''
-        mock_get_conn.return_value.__enter__.return_value = self.sqliteconn
         try:
             with timeout(1.5):
                 self.receiver.run()
         except RuntimeError:
             pass
 
-        assert self.sqliteconn.commit.called
         assert self.receiver.assert_parent_exists.called
 
 

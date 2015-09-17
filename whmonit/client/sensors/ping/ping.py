@@ -189,7 +189,7 @@ def do_one(dest_addr, timeout):
             # Operation not permitted
             msg = msg + (
                 " - Note that ICMP messages can only be sent from processes"
-                " running as root."
+                " running as root or having CAP_NET_RAW capability set."
             )
             raise socket.error(msg)
         raise  # raise the original error

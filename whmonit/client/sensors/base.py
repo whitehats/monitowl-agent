@@ -12,7 +12,6 @@ from whmonit.common.enums import INTERNAL_SENSORS
 from whmonit.common.metaclasses import BaseCheckMeta, CheckException
 from whmonit.common.types import PRIMITIVE_TYPE_REGISTRY
 from whmonit.common.validators import ValidatorWithDefault
-from whmonit.common.units import unit_reg
 
 
 class InvalidDataError(Exception):

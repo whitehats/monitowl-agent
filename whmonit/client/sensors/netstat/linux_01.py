@@ -60,7 +60,7 @@ class Sensor(TaskSensorBase):
         import psutil
 
         # if there is no interface provided, count all data
-        if 'interface' in self.config:
+        if self.config.get('interface', None):
             data = psutil.net_io_counters(pernic=True)[self.config['interface']]
         else:
             data = psutil.net_io_counters()
