@@ -42,7 +42,7 @@ Building the executable yourself
     $ git clone https://github.com/whitehats/monitowl-agent.git
     $ cd monitowl-agent
     $ pip install -r requirements.txt
-    $ pip install https://github.com/whitehats/pyinstaller/archive/1fcfc3766ecff858e9ddb05bfc9de70aebf57c9e.zip
+    $ pip install https://github.com/whitehats/pyinstaller/archive/dcccb4e604fe458f4ca64a7b0cd6ce95aa55f55b.zip
     $ pyinstaller bundle.spec
 
 The resulting file will be in ``dist/monitowl-agent``.

@@ -1,15 +1,18 @@
 # -*- mode: python -*-
 # vi: ft=python
 
-from PyInstaller.hooks.hookutils import collect_submodules
+import sys
+
+from PyInstaller.utils.hooks.hookutils import collect_submodules
 
 
 block_cipher = None
 
+sys.path.append('.')
 
 a = Analysis(['run_agent'],
              pathex=[],
-             hiddenimports=collect_submodules('whmonit.client.sensors'),
+             hiddenimports=collect_submodules('whmonit.client.sensors') + ['cffi'],
              hookspath=None,
              runtime_hooks=None,
              excludes=['_tkinter'],
