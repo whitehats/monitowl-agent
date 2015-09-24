@@ -1,3 +1,6 @@
+.. image:: https://travis-ci.org/whitehats/monitowl-agent.svg?branch=master
+    :target: https://travis-ci.org/whitehats/monitowl-agent
+
 `MonitOwl`_ Agent
 -----------------
 
@@ -42,7 +45,7 @@ Building the executable yourself
     $ git clone https://github.com/whitehats/monitowl-agent.git
     $ cd monitowl-agent
     $ pip install -r requirements.txt
-    $ pip install https://github.com/whitehats/pyinstaller/archive/dcccb4e604fe458f4ca64a7b0cd6ce95aa55f55b.zip
+    $ pip install https://github.com/whitehats/pyinstaller/archive/370ab7d7562fc95f82e2ea10d71d69b491f96deb.zip
     $ pyinstaller bundle.spec
 
 The resulting file will be in ``dist/monitowl-agent``.

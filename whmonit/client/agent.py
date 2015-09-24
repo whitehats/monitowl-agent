@@ -118,7 +118,7 @@ def make_request(ca_path, cert, params, function, url, data=None, hooks=None, he
         data=data,
         headers=headers,
         params=params,
-        verify=ca_path,
+        verify=True,
         cert=cert,
         hooks=hooks
     )
@@ -980,7 +980,6 @@ class Agent(object):
         reqman = RequestManager(remote.url,
                                 ssloptions={
                                     "cert_reqs": ssl.CERT_REQUIRED,
-                                    "ca_certs": self.ca_path
                                     })
         try:
             cert = reqman.request(
