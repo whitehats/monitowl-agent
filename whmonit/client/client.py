@@ -23,7 +23,7 @@ CA_FILE = "ca.crt"
 LOG = getLogger('client')
 
 
-def init_crypto():
+def init_crypto(csr_file=CSR_FILE, key_file=KEY_FILE):
     '''
     Generate private key and CSR for secure communication
     '''
@@ -42,9 +42,9 @@ def init_crypto():
     req.set_pubkey(key)
     req.sign(key, 'sha1')
 
-    with open(CSR_FILE, "wt", 0o400) as fileh:
+    with open(csr_file, "wt", 0o400) as fileh:
         fileh.write(crypto.dump_certificate_request(crypto.FILETYPE_PEM, req))
-    with open(KEY_FILE, "wt", 0o400) as fileh:
+    with open(key_file, "wt", 0o400) as fileh:
         fileh.write(crypto.dump_privatekey(crypto.FILETYPE_PEM, key))
     LOG.info("Crypto files Key and CSR created")
 

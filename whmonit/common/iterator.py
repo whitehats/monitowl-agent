@@ -2,7 +2,7 @@
 Additional generic iterables.
 '''
 
-from itertools import combinations, chain, tee, izip
+from itertools import combinations, chain, tee, izip, izip_longest
 
 
 def subsets(list_):
@@ -38,3 +38,13 @@ def pairwise(iterable):
     first, second = tee(iterable)
     next(second, None)
     return izip(first, second)
+
+
+def pairwise_with_final(iterable, fillvalue=None):
+    '''
+    Like `pairwise`, but fills last element with `fillvalue` on uneven
+    iterables lengths.
+    '''
+    first, second = tee(iterable)
+    next(second, None)
+    return izip_longest(first, second, fillvalue=fillvalue)

@@ -68,6 +68,7 @@ from whmonit.common.webclient import RequestManager, ComputationError
 
 
 SENSOR_TIMEOUT_EXITCODE = 22
+SENSOR_PPIDCHANGED_EXITCODE = 23
 
 
 class TimeoutException(RuntimeError):
@@ -118,7 +119,7 @@ def make_request(ca_path, cert, params, function, url, data=None, hooks=None, he
         data=data,
         headers=headers,
         params=params,
-        verify=True,
+        verify=ca_path,
         cert=cert,
         hooks=hooks
     )
@@ -444,7 +445,8 @@ class Sensor(multiprocessing.Process):
                     # Check if parent changed or died (might raise
                     # psutil.NoSuchProcess exception).
                     if self.ppid != self.process.ppid():
-                        raise Exception('Parent changed')
+                        self.log.error('Parent PID changed, exiting')
+                        sys.exit(SENSOR_PPIDCHANGED_EXITCODE)
 
             elif isinstance(sensor_instance, AdvancedSensorBase):
                 # Pass the control to the sensor.
@@ -637,7 +639,7 @@ class Shipper(AgentInternal):
         try:
             data = json.loads(response.text)
         except ValueError:
-            self.log.error('Received data are invalid.')
+            self.log.error('Received data is invalid.')
             return
         if data['status'] == 'ERROR_PARTIAL_STORE':
             # Used builtin function
@@ -885,14 +887,17 @@ class Agent(object):
             )
             try:
                 req = self.make_request(requests.get, remote.url)
-                if req.status_code != 200:
-                    raise StatusCodeException(
-                        'Error while fetching config from `{}`: {}'
-                        .format(remote.url, req.text)
-                    )
-                loaded_config = json.loads(req.text)['config']
-                self.save_config(loaded_config)
-                return
+
+                if req.status_code == 200:
+                    loaded_config = json.loads(req.text)['config']
+                    self.save_config(loaded_config)
+                    return
+
+                self.log.error(
+                    "Server-side error occurred while fetching "
+                    "config from `%s`: `%d`(%s)",
+                    remote.url, req.status_code, req.text,
+                )
             except requests.RequestException:
                 self.log.info(
                     'Connection problem while asking for config.',
@@ -901,7 +906,7 @@ class Agent(object):
             except AssertionError as ex:
                 self.log.info(str(ex))
                 raise
-            time.sleep(10)
+            time.sleep(60)
         raise ConnectionException(
             '5 attempts for remote config failed. Read error log.'
         )
@@ -980,6 +985,7 @@ class Agent(object):
         reqman = RequestManager(remote.url,
                                 ssloptions={
                                     "cert_reqs": ssl.CERT_REQUIRED,
+                                    "ca_certs": self.ca_path
                                     })
         try:
             cert = reqman.request(

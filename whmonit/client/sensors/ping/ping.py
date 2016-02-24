@@ -74,12 +74,6 @@
     Changed the struct.pack() calls to pack the checksum and ID as
     unsigned. My thanks to Jerome Poincheval for the fix.
 
-
-    Last commit info:
-    ~~~~~~~~~~~~~~~~~
-    $LastChangedDate: $
-    $Rev: $
-    $Author: $
 '''
 
 
@@ -203,29 +197,3 @@ def do_one(dest_addr, timeout):
     return delay
 
 
-def verbose_ping(dest_addr, timeout=2, count=4):
-    '''
-    Send >count< ping to >dest_addr< with the given >timeout< and display
-    the result.
-    '''
-    for i in xrange(count):
-        print "ping %s..." % dest_addr,
-        try:
-            delay = do_one(dest_addr, timeout)
-        except socket.gaierror, e:
-            print "failed. (socket error: '%s')" % e[1]
-            break
-
-        if not delay:
-            print "failed. (timeout within %ssec.)" % timeout
-        else:
-            delay = delay * 1000
-            print "get ping in %0.4fms" % delay
-    print
-
-
-if __name__ == '__main__':
-    verbose_ping("heise.de")
-    verbose_ping("google.com")
-    verbose_ping("a-test-url-taht-is-not-available.com")
-    verbose_ping("192.168.1.1")

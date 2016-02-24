@@ -28,7 +28,6 @@ from __future__ import absolute_import
 import math
 import calendar
 from datetime import datetime, timedelta
-from dateutil.relativedelta import relativedelta
 
 from .error import Error
 
@@ -120,68 +119,3 @@ def milliseconds_to_datetime(timestamp):
     #: timestamp values. We use little hack here with python timedelta
     #: class which doesn't have that problem.
     return datetime.utcfromtimestamp(0) + timedelta(milliseconds=timestamp)
-
-
-def month_diff(date1, date2):
-    '''
-    Calculates difference between two dates in months.
-    '''
-    delta = relativedelta(date1, date2)
-
-    # This is for taking floor,
-    # eg (-1 month -2 days) is actually (-2 months) when counting starting point.
-    sub = int(
-        delta.days < 0 or
-        delta.hours < 0 or
-        delta.minutes < 0 or
-        delta.seconds < 0 or
-        delta.microseconds < 0
-    )
-
-    return float(delta.years * 12 + delta.months - sub)
-
-
-def year_diff(date1, date2):
-    '''
-    Calculates difference between two dates in years.
-    '''
-    return math.floor(month_diff(date1, date2) / 12)
-
-
-def day_diff(date1, date2):
-    '''
-    Calculates difference between two dates in days.
-
-    This should work for leap seconds since timedelta stores days and seconds separately.
-    The only problem remains with additional second at the end of some days but the
-    hour 23:59:60 isn't even accepted by datetime - this second, while counting seconds,
-    will be skipped.
-
-    Also, there's no need for floor, since seconds are always positive
-    '''
-    return float((date1 - date2).days)
-
-
-def week_diff(date1, date2):
-    '''
-    Calculates difference between two dates in weeks.
-    This is just for convenience
-    '''
-    return math.floor(day_diff(date1, date2) / 7)
-
-
-def second_diff(date1, date2):
-    '''
-    Calculates difference between two dates in seconds.
-    '''
-    return (date1 - date2).total_seconds()
-
-
-def diff_function(period):
-    '''
-    Return function that calculates difference between two dates in ``periods``.
-
-    :param period: string with period name, one of ``[second, day, week, month, year]``
-    :raises: :class:`KeyError` if ``period`` is another value
-    '''
-    return globals()['{}_diff'.format(period)]

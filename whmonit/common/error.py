@@ -121,7 +121,7 @@ class ErrorType(type):
         )
 
         env = {'this_exception_class': cls}
-        exec code in env
+        exec(code, env)
 
         cls.__init__ = env['__init__']
         cls.text = text_property

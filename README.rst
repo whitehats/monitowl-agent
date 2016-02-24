@@ -1,6 +1,9 @@
 .. image:: https://travis-ci.org/whitehats/monitowl-agent.svg?branch=master
     :target: https://travis-ci.org/whitehats/monitowl-agent
 
+.. image:: https://codecov.io/github/whitehats/monitowl-agent/coverage.svg?branch=master
+    :target: https://codecov.io/github/whitehats/monitowl-agent?branch=master
+
 `MonitOwl`_ Agent
 -----------------
 
@@ -45,12 +48,10 @@ Building the executable yourself
     $ git clone https://github.com/whitehats/monitowl-agent.git
     $ cd monitowl-agent
     $ pip install -r requirements.txt
-    $ pip install https://github.com/whitehats/pyinstaller/archive/370ab7d7562fc95f82e2ea10d71d69b491f96deb.zip
+    $ pip install pyinstaller
     $ pyinstaller bundle.spec
 
 The resulting file will be in ``dist/monitowl-agent``.
-
-**Note**: Pyinstaller==2.1 has a problem handling the cryptography package, so we are currently using a commit from the develop branch where it is fixed.
 
 Using setuptools
 ^^^^^^^^^^^^^^^^

@@ -5,3 +5,7 @@ install:
   - pip install -r requirements.txt
   - pip install RandomWords==0.1.12
 script: py.test
+before_install:
+  - pip install codecov
+after_success:
+  - codecov
