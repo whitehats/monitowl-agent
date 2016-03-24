@@ -14,15 +14,18 @@ class Sensor(TaskSensorBase):
     streams = {
         'proc_avg': {
             'type': float,
-            'description': 'Processors usage percentage.'
+            'description': 'Processors usage percentage.',
+            'unit': '%'
         },
         'vmem_perc': {
             'type': float,
-            'description': 'Virtual memory usage percentage.'
+            'description': 'Virtual memory usage percentage.',
+            'unit': '%'
         },
         'smem_perc': {
             'type': float,
-            'description': 'Swap memory usage percentage.'
+            'description': 'Swap memory usage percentage.',
+            'unit': '%'
         }
     }
 

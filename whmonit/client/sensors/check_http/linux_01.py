@@ -4,7 +4,7 @@
 Check HTTP sensor.
 '''
 from whmonit.client.sensors import TaskSensorBase
-
+from whmonit.common.units import unit_reg
 
 class Sensor(TaskSensorBase):
     '''
@@ -28,7 +28,8 @@ class Sensor(TaskSensorBase):
         },
         'response_time': {
             'type': float,
-            'description': 'Response time.'
+            'description': 'Response time.',
+            'unit': str(unit_reg.second)
         }
     }
 

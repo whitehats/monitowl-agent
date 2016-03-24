@@ -30,7 +30,8 @@ class Sensor(TaskSensorBase):
         },
         'percent': {
             'type': float,
-            'description': 'Percentage usage of the disk.'
+            'description': 'Percentage usage of the disk.',
+            'unit': '%'
         }
     }
     config_schema = {

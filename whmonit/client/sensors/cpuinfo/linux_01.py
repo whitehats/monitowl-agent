@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 '''Cpuinfo sensor.'''
 import platform
-import psutil
 
 from whmonit.client.sensors.base import TaskSensorBase
 
@@ -66,6 +65,8 @@ class Sensor(TaskSensorBase):
 
     def do_run(self):
         '''Returns 'cpuinfo' contents as a string.'''
+        import psutil
+
         times = psutil.cpu_times()
         return (
             ('name', str(platform.processor())),

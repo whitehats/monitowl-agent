@@ -1,6 +1,5 @@
 # -*- encoding: utf-8 -*-
 import inspect
-import psutil
 import re
 import sys
 from abc import abstractproperty
@@ -232,6 +231,8 @@ class SensorBase(object):
         '''
 
         # Make sensor process behave nice on the CPU.
+        import psutil
+
         proc = psutil.Process()
         if sys.platform in ['linux2', 'darwin']:
             proc.nice(19)

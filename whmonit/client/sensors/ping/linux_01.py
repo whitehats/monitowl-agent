@@ -24,7 +24,7 @@ class Sensor(TaskSensorBase):
             'description':
                 'Time from sending message to destination host '
                 'to receiving acknowledgment.',
-            'unit': str(unit_reg.millisec)
+            'unit': str(unit_reg.second)
         }
     }
     config_schema = {

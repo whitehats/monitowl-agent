@@ -47,6 +47,10 @@ class Sensor(TaskSensorBase):
             'type': str,
             'description': 'Query result.',
         },
+        'result_num': {
+            'type': float,
+            'description': 'Query result numeric.',
+        },
         'query_time': {
             'type': float,
             'description': 'Time taken to execute the query.',
@@ -150,11 +154,7 @@ class Sensor(TaskSensorBase):
         listen(connection, 'before_cursor_execute', start_query)
         listen(connection, 'after_cursor_execute', end_query)
         try:
-            result = connection.execute(query)
-            return (
-                ('result', ', '.join(str(row) for row in result)),
-                ('query_time', connection.info['wh_time'])
-            )
+            result = connection.execute(query).fetchall()
         except exc.StatementError as err:
             return ((
                 'error', error_msg.format(
@@ -169,3 +169,13 @@ class Sensor(TaskSensorBase):
             ),)
         finally:
             connection.close()
+
+        try:
+            if len(result) == 1 and len(result[0]) == 1:
+                result = ('result_num', float(result[0][0]))
+            else:
+                raise ValueError
+        except ValueError:
+            result = ('result', str(result)[1:-1])
+
+        return (result, ('query_time', connection.info['wh_time']))

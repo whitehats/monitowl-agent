@@ -330,8 +330,14 @@ def __init_logging():
     # Let's do this for Tornado as well!
     logging.getLogger("tornado").addHandler(__handler)
 
-    sys.excepthook = __logger.excepthook
+    # Let's make Celery behave a bit, too.
+    # We have to set level here, because `--loglevel` in Celery
+    # sets *root loggers' level*, which we definitely don't want.
+    __celery = logging.getLogger("celery")
+    __celery.setLevel(logging.WARNING)
+    __celery.addHandler(__handler)
 
+    sys.excepthook = __logger.excepthook
 
 # At module level, because we want to do this only once
 __init_logging()

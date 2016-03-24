@@ -167,6 +167,7 @@ def prepare_sqlite(sqlite_factory):
     connection = sqlite_factory()
     cursor = connection.cursor()
 
+    cursor.execute('PRAGMA journal_mode=WAL')
     cursor.execute('PRAGMA auto_vacuum = FULL')
     cursor.execute(
         'CREATE TABLE IF NOT EXISTS sensordata (stamp TEXT, config_id '

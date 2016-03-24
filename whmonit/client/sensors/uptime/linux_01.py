@@ -3,10 +3,10 @@
 '''
 Uptime sensor.
 '''
-import psutil
 import time
 
 from whmonit.client.sensors import TaskSensorBase
+from whmonit.common.units import unit_reg
 
 
 class Sensor(TaskSensorBase):
@@ -20,11 +20,14 @@ class Sensor(TaskSensorBase):
     streams = {
         'default': {
             'type': float,
-            'description': 'System uptime.'
+            'description': 'System uptime.',
+            'unit': str(unit_reg.second),
         }
     }
 
     def do_run(self):
         '''Returns system uptime.'''
+        import psutil
+
         contents = time.time() - psutil.boot_time()
         return (("default", float(contents)),)

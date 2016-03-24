@@ -8,11 +8,13 @@ from PyInstaller.utils.hooks import collect_submodules
 
 block_cipher = None
 
+deps = ['cffi', 'pymysql']
+
 sys.path.append('.')
 
 a = Analysis(['run_agent'],
              pathex=[],
-             hiddenimports=collect_submodules('whmonit.client.sensors') + ['cffi'],
+             hiddenimports=collect_submodules('whmonit.client.sensors') + deps,
              hookspath=None,
              runtime_hooks=None,
              excludes=['_tkinter'],

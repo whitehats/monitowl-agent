@@ -22,3 +22,6 @@ interruptingcow==0.6
 Monotime==1.0
 dnspython==1.12.0
 pysnmp==4.3.2
+SQLAlchemy==1.0.12
+psycopg2==2.6.1
+pymysql==0.7.2
