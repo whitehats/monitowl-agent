@@ -259,7 +259,17 @@ class StorageManager(object):
         self.log = logger(self.__class__.__name__)
         self.storages = {}
         self.manager = SyncManager()
-        self.manager.start(partial(signal.signal, signal.SIGINT, signal.SIG_IGN))
+
+        def ignore_signals():
+            '''
+            Ignores SIGINT and SIGTERM.
+            We don't want them propagated to SyncManager, because
+            we want to store its' state to disk on Agent shutdown.
+            '''
+            signal.signal(signal.SIGINT, signal.SIG_IGN)
+            signal.signal(signal.SIGTERM, signal.SIG_IGN)
+
+        self.manager.start(ignore_signals)
 
         self.ppid = None
 
@@ -297,7 +307,7 @@ class StorageManager(object):
         Flushes all remaining storages into sqlite
         and shuts down manager.
         '''
-        self.log.debug('Shutting down storage manager')
+        self.log.debug('Storage manager: Started shutdown')
 
         cursor = self.sqliteconn.cursor()
         for sensor, store in self.storages.iteritems():
@@ -309,6 +319,8 @@ class StorageManager(object):
         self.sqliteconn.commit()
         self.sqliteconn.close()
         self.manager.shutdown()
+
+        self.log.debug('Storage manager: Finished shutdown')
 
 
 class Sensor(multiprocessing.Process):
@@ -702,8 +714,6 @@ class Agent(object):
         self.sqlite_factory = get_sqlite_factory(sqlite_path)
         prepare_sqlite(self.sqlite_factory)
 
-        self.storage_manager = StorageManager(self.sqlite_factory)
-
         self.running = True
 
     def check_connection(self):
@@ -1091,6 +1101,13 @@ class Agent(object):
         # Spawn processes for data transfer.
         self._start_subprocess(Receiver, (self._queue, self.sqlite_factory))
         self._start_subprocess(Shipper, (send_results, self.sqlite_factory))
+
+        # Defined here, because we are only able to properly terminate it
+        # after Agents' loop is actually run (that means e.g. after getting
+        # certificates from collector).
+        # Hopefully we'll be able to refactor it at some point.
+        # pylint: disable=W0201
+        self.storage_manager = StorageManager(self.sqlite_factory)
 
         # Periodically check child processes and restart them if needed.
         recheck_config_timeout = 1

@@ -347,8 +347,20 @@ class AgentRequest(list):
     '''
     This type is being used in agent <> collector communication. It holds list
      of ``AgentRequestChunk`` objects.
+
+    Note that the default representation shows only the arity of container,
+    without its' actual contents. This is mainly to prevent polluting logs
+    with lots of data.
+    To show the contents, one has to explicitly call `str` on the instance.
     '''
-    pass
+
+    def __str__(self):
+        # W0141: Used builtin 'map'.
+        # pylint: disable=W0141
+        return "AgentRequest<{}>[{}]".format(len(self), ','.join(map(str, self)))
+
+    def __repr__(self):
+        return "AgentRequest<{}>".format(len(self))
 
 
 class AgentRequestChunk(object):

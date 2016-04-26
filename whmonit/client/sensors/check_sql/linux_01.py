@@ -57,19 +57,20 @@ class Sensor(TaskSensorBase):
         },
     }
 
-    config_schema = {
+    # TODO #1671: Better way for getting raw config
+    config_raw = config_schema = {
         '$schema': 'http://json-schema.org/schema#',
         'type': 'object',
         'properties': {
-            'scheme': {
+            'dbtype': {
                 'type': 'string',
                 'enum': ['postgresql', 'mysql', 'oracle', 'mssql', 'sqlite']
             },
             'host': {
                 'type': 'string',
                 'default': '',
-                'description': 'Address to the server. Can be unix socket or '
-                               'sqlite file. Defaults to unix domain socket.'
+                'description': 'Server address. '
+                               'Can be IP, hostname, socket or sqlite file.'
             },
             'port': {
                 'type': 'integer',
@@ -87,7 +88,7 @@ class Sensor(TaskSensorBase):
                 'description': 'Database password. '
                                'Not necessary for unix domain socket.'
             },
-            'dbname': {
+            'database': {
                 'type': 'string',
                 'description': 'Name of the database.'
             },
@@ -96,15 +97,18 @@ class Sensor(TaskSensorBase):
                 'description': 'SQL query to send to database.'
             }
         },
-        'required': ['scheme', 'host', 'query'],
+        'required': ['dbtype', 'host', 'query'],
         'additionalProperties': False
     }
 
     def do_run(self):
+        # R0914: Too many local variables.
+        # pylint: disable=R0914
+
         import sqlalchemy
         from sqlalchemy import exc
         from sqlalchemy.event import listen
-        from furl import furl
+        from sqlalchemy.engine.url import URL
 
         def start_query(conn, *dummy):
             ''' Save time the query starts. '''
@@ -114,21 +118,21 @@ class Sensor(TaskSensorBase):
             ''' Save time the query's finished. '''
             conn.info['wh_time'] = timeit.default_timer() - conn.info['wh_time']
 
-        config = self.config.copy()
-        del config['memory_limit']
-        del config['frequency']
-        del config['run_timeout']
+        config = {
+            k: v for k, v in self.config.iteritems()
+            if k in self.config_raw['properties'].keys()
+        }
+        config['drivername'] = config.pop('dbtype')
 
-        # Sqlite wants another '/'...
-        if config['scheme'] == 'sqlite':
-            config['host'] = "/{}".format(config['host'])
+        if config['drivername'] == 'sqlite':
+            config['database'] = config.pop('host')
 
         query = config.pop('query')
 
-        urlf = furl().set(**config)
+        url = URL(**config)
 
         try:
-            engine = sqlalchemy.create_engine(urlf.url)
+            engine = sqlalchemy.create_engine(url)
         except ImportError as err:
             return ((
                 'error',
@@ -138,7 +142,7 @@ class Sensor(TaskSensorBase):
 
         error_msg = (
             '(database {})\nError: {{}}\n Message from database: "{{}}"'
-            .format(urlf.set(password='*****').url)
+            .format(url.__to_string__())
         )
         try:
             connection = engine.connect()
@@ -155,6 +159,7 @@ class Sensor(TaskSensorBase):
         listen(connection, 'after_cursor_execute', end_query)
         try:
             result = connection.execute(query).fetchall()
+            time = connection.info['wh_time']
         except exc.StatementError as err:
             return ((
                 'error', error_msg.format(
@@ -178,4 +183,4 @@ class Sensor(TaskSensorBase):
         except ValueError:
             result = ('result', str(result)[1:-1])
 
-        return (result, ('query_time', connection.info['wh_time']))
+        return (result, ('query_time', time))

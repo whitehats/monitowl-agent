@@ -10,6 +10,7 @@ import logging
 import logging.handlers
 import os
 import re
+import signal
 import sys
 import time
 import traceback
@@ -20,9 +21,11 @@ from colorclass import Color, Windows
 
 
 # Our own logging values for WebServer usage.
-# High to make sure they are always printed.
-SEND = 60
-RECV = 70
+# Low to make sure they are not printed, unless
+# enabled explicitly.
+SEND = 7
+RECV = 5
+UBERDEBUG = 3
 
 
 def getLogger(name=None):
@@ -292,22 +295,25 @@ def __init_logging():
     '''
     logging.addLevelName(SEND, 'SEND')
     logging.addLevelName(RECV, 'RECV')
+    logging.addLevelName(UBERDEBUG, 'UBERDEBUG')
 
     def send(self, msg, *args, **kwargs):
         '''
         Helper for logging incoming messages.
         '''
-        # Access to a protected member of a client class
-        # pylint: disable=W0212
-        self._log(SEND, json.dumps(msg, indent=2), args, **kwargs)
+        self.log(SEND, json.dumps(msg, indent=2), args, **kwargs)
 
     def recv(self, msg, *args, **kwargs):
         '''
         Helper for logging outgoing messages.
         '''
-        # Access to a protected member of a client class
-        # pylint: disable=W0212
-        self._log(RECV, json.dumps(msg, indent=2), args, **kwargs)
+        self.log(RECV, json.dumps(msg, indent=2), args, **kwargs)
+
+    def uberdebug(self, msg, *args, **kwargs):
+        '''
+        Helper for logging even more debug.
+        '''
+        self.log(UBERDEBUG, msg, args, **kwargs)
 
     def excepthook(self, ex_cls, ex, tback):
         '''
@@ -320,6 +326,7 @@ def __init_logging():
     # manager as well...
     logging.Logger.send = send
     logging.Logger.recv = recv
+    logging.Logger.uberdebug = uberdebug
     logging.Logger.excepthook = excepthook
     __handler = logging.StreamHandler()
     __handler.setFormatter(DefaultFormatter())
@@ -338,6 +345,19 @@ def __init_logging():
     __celery.addHandler(__handler)
 
     sys.excepthook = __logger.excepthook
+
+    def __set_level(level):
+        '''
+        Helper for switching log levels with signals.
+        '''
+        __logger.setLevel(level)
+        __logger.debug(
+            "Log level switched to `%s`", logging.getLevelName(level),
+        )
+
+    __rtmin = signal.SIGRTMIN
+    for i, level in enumerate([UBERDEBUG, RECV, SEND, logging.DEBUG]):
+        signal.signal(__rtmin + i, lambda s, f, l=level: __set_level(l))
 
 # At module level, because we want to do this only once
 __init_logging()
